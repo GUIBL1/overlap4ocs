@@ -377,3 +377,8 @@ pyrightconfig.json
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,visualstudiocode,pycharm,python,jupyternotebooks
+
+docs/plan
+docs/swot.pdf
+docs/htsim-integration
+tests
