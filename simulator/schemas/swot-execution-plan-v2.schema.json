@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "swot-execution-plan/v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "case_id", "strategy", "units", "workload", "topology", "transport", "execution_mode", "run_limits", "dependency_mode", "path_preparation_policy", "configurations", "logical_segments", "readiness_tokens", "steps", "flow_groups", "flows", "plane_programs", "planner_certificate", "provenance"],
+  "properties": {
+    "schema_version": {"const": "swot-execution-plan/v2"},
+    "case_id": {"$ref": "#/$defs/case_id"},
+    "strategy": {"$ref": "#/$defs/strategy"},
+    "units": {"$ref": "#/$defs/units"},
+    "workload": {"$ref": "#/$defs/workload"},
+    "topology": {"$ref": "#/$defs/topology"},
+    "transport": {"$ref": "#/$defs/transport"},
+    "execution_mode": {"enum": ["exact_coalesced", "full_packet"]},
+    "run_limits": {"$ref": "#/$defs/run_limits"},
+    "dependency_mode": {"enum": ["explicit_group_dag", "global_step_barrier"]},
+    "path_preparation_policy": {"enum": ["overlap_earliest", "static_preinstalled", "step_lockstep"]},
+    "configurations": {"type": "array", "items": {"$ref": "#/$defs/configuration"}},
+    "logical_segments": {"type": "array", "items": {"$ref": "#/$defs/logical_segment"}},
+    "readiness_tokens": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/readiness_token"}},
+    "steps": {"type": "array", "items": {"$ref": "#/$defs/step"}},
+    "flow_groups": {"type": "array", "items": {"$ref": "#/$defs/flow_group"}},
+    "flows": {"type": "array", "items": {"$ref": "#/$defs/flow"}},
+    "plane_programs": {"type": "array", "items": {"$ref": "#/$defs/plane_program"}},
+    "planner_certificate": {"$ref": "#/$defs/planner_certificate"},
+    "provenance": {"$ref": "#/$defs/provenance"}
+  },
+  "$defs": {
+    "uint64": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "positive_uint64": {"type": "integer", "minimum": 1, "maximum": 18446744073709551615},
+    "nullable_uint64": {"anyOf": [{"$ref": "#/$defs/uint64"}, {"type": "null"}]},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "nullable_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "git_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "nullable_git_sha": {"anyOf": [{"$ref": "#/$defs/git_sha"}, {"type": "null"}]},
+    "case_id": {"type": "string", "pattern": "^case-[0-9a-f]{64}$"},
+    "strategy": {"enum": ["baseline", "one_shot", "swot"]},
+    "uint64_array": {"type": "array", "items": {"$ref": "#/$defs/uint64"}, "uniqueItems": true},
+    "nonempty_uint64_array": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/uint64"}, "uniqueItems": true},
+    "units": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data", "rate", "time"],
+      "properties": {
+        "data": {"const": "byte"},
+        "rate": {"const": "bit_per_second"},
+        "time": {"const": "picosecond"}
+      }
+    },
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["collective_id", "algorithm_id", "algorithm_semantics_version", "collective_semantics_version", "rank_count", "message_bytes_per_rank"],
+      "properties": {
+        "collective_id": {"type": "string", "minLength": 1},
+        "algorithm_id": {"type": "string", "minLength": 1},
+        "algorithm_semantics_version": {"type": "string", "minLength": 1},
+        "collective_semantics_version": {"type": "string", "minLength": 1},
+        "rank_count": {"$ref": "#/$defs/positive_uint64"},
+        "message_bytes_per_rank": {"$ref": "#/$defs/uint64"}
+      }
+    },
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_count", "plane_count", "per_plane_bps", "data_latency_ps", "reconfiguration_delay_ps", "duplex", "initial_configuration_policy"],
+      "properties": {
+        "node_count": {"$ref": "#/$defs/positive_uint64"},
+        "plane_count": {"$ref": "#/$defs/positive_uint64"},
+        "per_plane_bps": {"$ref": "#/$defs/positive_uint64"},
+        "data_latency_ps": {"$ref": "#/$defs/uint64"},
+        "reconfiguration_delay_ps": {"$ref": "#/$defs/uint64"},
+        "duplex": {"const": "full"},
+        "initial_configuration_policy": {"const": "first_use_preinstalled"}
+      }
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "wire_model", "packetization", "mtu_bytes", "loss_mode", "ack_mode", "completion_semantics"],
+      "properties": {
+        "mode": {"const": "paper_exact"},
+        "wire_model": {"const": "payload_only"},
+        "packetization": {"const": "exact_tail"},
+        "mtu_bytes": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "loss_mode": {"const": "lossless"},
+        "ack_mode": {"const": "none"},
+        "completion_semantics": {"const": "receiver_last_payload_byte"}
+      }
+    },
+    "run_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seed", "max_sim_time_ps", "max_events"],
+      "properties": {
+        "seed": {"$ref": "#/$defs/uint64"},
+        "max_sim_time_ps": {"$ref": "#/$defs/positive_uint64"},
+        "max_events": {"$ref": "#/$defs/positive_uint64"}
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["configuration_id", "permutation"],
+      "properties": {
+        "configuration_id": {"$ref": "#/$defs/uint64"},
+        "permutation": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/uint64"}}
+      }
+    },
+    "logical_segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["segment_id", "buffer_offset_bytes", "length_bytes", "origin_rank_ids", "final_destination_rank_ids"],
+      "properties": {
+        "segment_id": {"$ref": "#/$defs/uint64"},
+        "buffer_offset_bytes": {"$ref": "#/$defs/uint64"},
+        "length_bytes": {"$ref": "#/$defs/positive_uint64"},
+        "origin_rank_ids": {"$ref": "#/$defs/nonempty_uint64_array"},
+        "final_destination_rank_ids": {"$ref": "#/$defs/nonempty_uint64_array"}
+      }
+    },
+    "readiness_token": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token_id", "token_type", "producer_id"],
+      "properties": {
+        "token_id": {"$ref": "#/$defs/uint64"},
+        "token_type": {"enum": ["collective_start", "flow_group_complete", "step_complete"]},
+        "producer_id": {"$ref": "#/$defs/nullable_uint64"}
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_id", "phase", "flow_group_ids", "completion_token_id"],
+      "properties": {
+        "step_id": {"$ref": "#/$defs/uint64"},
+        "phase": {"type": "string", "minLength": 1},
+        "flow_group_ids": {"$ref": "#/$defs/nonempty_uint64_array"},
+        "completion_token_id": {"$ref": "#/$defs/uint64"}
+      }
+    },
+    "flow_group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flow_group_id", "step_id", "plane_id", "program_epoch_id", "configuration_id", "depends_on_token_ids", "completion_token_id", "flow_ids"],
+      "properties": {
+        "flow_group_id": {"$ref": "#/$defs/uint64"},
+        "step_id": {"$ref": "#/$defs/uint64"},
+        "plane_id": {"$ref": "#/$defs/uint64"},
+        "program_epoch_id": {"$ref": "#/$defs/uint64"},
+        "configuration_id": {"$ref": "#/$defs/uint64"},
+        "depends_on_token_ids": {"$ref": "#/$defs/nonempty_uint64_array"},
+        "completion_token_id": {"$ref": "#/$defs/uint64"},
+        "flow_ids": {"$ref": "#/$defs/nonempty_uint64_array"}
+      }
+    },
+    "segment_slice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["segment_id", "segment_offset_bytes", "length_bytes"],
+      "properties": {
+        "segment_id": {"$ref": "#/$defs/uint64"},
+        "segment_offset_bytes": {"$ref": "#/$defs/uint64"},
+        "length_bytes": {"$ref": "#/$defs/positive_uint64"}
+      }
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flow_id", "flow_group_id", "src_rank", "dst_rank", "payload_bytes", "segment_slices"],
+      "properties": {
+        "flow_id": {"$ref": "#/$defs/uint64"},
+        "flow_group_id": {"$ref": "#/$defs/uint64"},
+        "src_rank": {"$ref": "#/$defs/uint64"},
+        "dst_rank": {"$ref": "#/$defs/uint64"},
+        "payload_bytes": {"$ref": "#/$defs/positive_uint64"},
+        "segment_slices": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/segment_slice"}}
+      }
+    },
+    "program_epoch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["program_epoch_id", "transition", "configuration_id", "path_prep_not_before_token_ids", "flow_group_ids"],
+      "properties": {
+        "program_epoch_id": {"$ref": "#/$defs/uint64"},
+        "transition": {"enum": ["initial", "reconfigure", "retain"]},
+        "configuration_id": {"$ref": "#/$defs/uint64"},
+        "path_prep_not_before_token_ids": {"$ref": "#/$defs/uint64_array"},
+        "flow_group_ids": {"$ref": "#/$defs/nonempty_uint64_array"}
+      }
+    },
+    "plane_program": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plane_id", "epochs"],
+      "properties": {
+        "plane_id": {"$ref": "#/$defs/uint64"},
+        "epochs": {"type": "array", "items": {"$ref": "#/$defs/program_epoch"}}
+      }
+    },
+    "nominal_schedule_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flow_group_id", "planned_release_ps", "planned_complete_ps"],
+      "properties": {
+        "flow_group_id": {"$ref": "#/$defs/uint64"},
+        "planned_release_ps": {"$ref": "#/$defs/uint64"},
+        "planned_complete_ps": {"$ref": "#/$defs/uint64"}
+      }
+    },
+    "planner_certificate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["planner_name", "planner_version", "solver_name", "solver_status", "objective_ps", "bound_ps", "relative_gap_ppm", "decision_sha256", "nominal_schedule", "integer_lowering_rule", "integer_lowering_version"],
+      "properties": {
+        "planner_name": {"type": "string", "minLength": 1},
+        "planner_version": {"type": "string", "minLength": 1},
+        "solver_name": {"type": ["string", "null"], "minLength": 1},
+        "solver_status": {"enum": ["feasible", "not_used", "optimal", "time_limit_with_incumbent"]},
+        "objective_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "bound_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "relative_gap_ppm": {"$ref": "#/$defs/nullable_uint64"},
+        "decision_sha256": {"$ref": "#/$defs/nullable_sha256"},
+        "nominal_schedule": {"type": "array", "items": {"$ref": "#/$defs/nominal_schedule_entry"}},
+        "integer_lowering_rule": {"type": "string", "minLength": 1},
+        "integer_lowering_version": {"type": "string", "minLength": 1}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_kind", "overlap4ocs_git_sha", "htsim_upstream_git_sha", "htsim_local_patchset_sha256", "instance_file_sha256", "program_file_sha256", "collective_ir_sha256", "plan_build_context_sha256"],
+      "properties": {
+        "source_kind": {"enum": ["hand_authored_fixture", "production"]},
+        "overlap4ocs_git_sha": {"$ref": "#/$defs/nullable_git_sha"},
+        "htsim_upstream_git_sha": {"$ref": "#/$defs/nullable_git_sha"},
+        "htsim_local_patchset_sha256": {"$ref": "#/$defs/nullable_sha256"},
+        "instance_file_sha256": {"$ref": "#/$defs/nullable_sha256"},
+        "program_file_sha256": {"$ref": "#/$defs/nullable_sha256"},
+        "collective_ir_sha256": {"$ref": "#/$defs/nullable_sha256"},
+        "plan_build_context_sha256": {"$ref": "#/$defs/nullable_sha256"}
+      }
+    }
+  }
+}

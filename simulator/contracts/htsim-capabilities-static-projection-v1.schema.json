@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "overlap4ocs-htsim-capabilities-static-projection/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "capability_schema_id", "plan_schema", "result_schema", "operation_event_schema", "abi_limits", "transport_modes", "execution_modes", "dependency_modes", "path_preparation_policies"],
+  "properties": {
+    "schema_version": {"const": "overlap4ocs-htsim-capabilities-static-projection/v1"},
+    "capability_schema_id": {"const": "htsim-ocs-capabilities/v1"},
+    "plan_schema": {"$ref": "#/$defs/schema_identity"},
+    "result_schema": {"$ref": "#/$defs/schema_identity"},
+    "operation_event_schema": {"$ref": "#/$defs/schema_identity"},
+    "abi_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["abi_limits_raw_sha256", "max_plan_file_bytes", "max_result_file_bytes", "min_mtu_bytes", "max_mtu_bytes", "max_payload_bytes", "max_pipe_inflight_transit_units"],
+      "properties": {
+        "abi_limits_raw_sha256": {"$ref": "#/$defs/sha256"},
+        "max_plan_file_bytes": {"$ref": "#/$defs/uint64"},
+        "max_result_file_bytes": {"$ref": "#/$defs/uint64"},
+        "min_mtu_bytes": {"$ref": "#/$defs/uint64"},
+        "max_mtu_bytes": {"$ref": "#/$defs/uint64"},
+        "max_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "max_pipe_inflight_transit_units": {"$ref": "#/$defs/uint64"}
+      }
+    },
+    "transport_modes": {"$ref": "#/$defs/string_set"},
+    "execution_modes": {"$ref": "#/$defs/string_set"},
+    "dependency_modes": {"$ref": "#/$defs/string_set"},
+    "path_preparation_policies": {"$ref": "#/$defs/string_set"}
+  },
+  "$defs": {
+    "uint64": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "schema_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_id", "raw_sha256"],
+      "properties": {
+        "schema_id": {"type": "string", "minLength": 1},
+        "raw_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "string_set": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    }
+  }
+}

@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 
 # Base runtime deps for running main.py + scripts/*.py with open-source solver path.
 dependencies = [
+  "jsonschema==4.25.1",
   "matplotlib==3.10.1",
   "networkx==3.4.2",
   "pulp==3.3.0",

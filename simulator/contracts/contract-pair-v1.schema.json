@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "overlap4ocs-contract-pair/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "fixture_id", "plan_path", "result_path", "plan_file_sha256", "result_file_sha256", "expected_status", "equality_checks"],
+  "properties": {
+    "schema_version": {"const": "overlap4ocs-contract-pair/v1"},
+    "fixture_id": {"type": "string", "minLength": 1},
+    "plan_path": {"$ref": "#/$defs/relative_path"},
+    "result_path": {"$ref": "#/$defs/relative_path"},
+    "plan_file_sha256": {"$ref": "#/$defs/sha256"},
+    "result_file_sha256": {"$ref": "#/$defs/sha256"},
+    "expected_status": {"enum": ["failure", "success"]},
+    "equality_checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["plan_json_pointer", "result_json_pointer"],
+        "properties": {
+          "plan_json_pointer": {"$ref": "#/$defs/json_pointer"},
+          "result_json_pointer": {"$ref": "#/$defs/json_pointer"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*//).+$"
+    },
+    "json_pointer": {"type": "string", "pattern": "^(?:|(?:/(?:[^~/]|~[01])*)+)$"}
+  }
+}

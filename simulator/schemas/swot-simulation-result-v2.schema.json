@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "swot-simulation-result/v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "case_id", "strategy", "status", "stop_reason", "plan_file_sha256", "units", "transport_mode", "wire_model", "completion_semantics", "execution_mode", "run_limits", "dependency_mode", "path_preparation_policy", "timing", "traffic", "tokens", "steps", "flow_groups", "flows", "planes", "invariants", "blocked_state", "error", "provenance"],
+  "properties": {
+    "schema_version": {"const": "swot-simulation-result/v2"},
+    "case_id": {"anyOf": [{"$ref": "#/$defs/case_id"}, {"type": "null"}]},
+    "strategy": {"anyOf": [{"$ref": "#/$defs/strategy"}, {"type": "null"}]},
+    "status": {"enum": ["failure", "success"]},
+    "stop_reason": {"enum": ["collective_complete", "deadlock", "internal_error", "invalid_input", "invariant_violation", "io_error", "max_event_count", "max_simulation_time", "unsupported_semantics"]},
+    "plan_file_sha256": {"$ref": "#/$defs/nullable_sha256"},
+    "units": {"anyOf": [{"$ref": "#/$defs/units"}, {"type": "null"}]},
+    "transport_mode": {"type": ["string", "null"], "enum": ["paper_exact", null]},
+    "wire_model": {"type": ["string", "null"], "enum": ["payload_only", null]},
+    "completion_semantics": {"type": ["string", "null"], "enum": ["receiver_last_payload_byte", null]},
+    "execution_mode": {"type": ["string", "null"], "enum": ["exact_coalesced", "full_packet", null]},
+    "run_limits": {"anyOf": [{"$ref": "#/$defs/run_limits"}, {"type": "null"}]},
+    "dependency_mode": {"type": ["string", "null"], "enum": ["explicit_group_dag", "global_step_barrier", null]},
+    "path_preparation_policy": {"type": ["string", "null"], "enum": ["overlap_earliest", "static_preinstalled", "step_lockstep", null]},
+    "timing": {"$ref": "#/$defs/timing"},
+    "traffic": {"anyOf": [{"$ref": "#/$defs/traffic"}, {"type": "null"}]},
+    "tokens": {"type": "array", "items": {"$ref": "#/$defs/token_result"}},
+    "steps": {"type": "array", "items": {"$ref": "#/$defs/step_result"}},
+    "flow_groups": {"type": "array", "items": {"$ref": "#/$defs/flow_group_result"}},
+    "flows": {"type": "array", "items": {"$ref": "#/$defs/flow_result"}},
+    "planes": {"type": "array", "items": {"$ref": "#/$defs/plane_result"}},
+    "invariants": {"$ref": "#/$defs/invariants"},
+    "blocked_state": {"anyOf": [{"$ref": "#/$defs/blocked_state"}, {"type": "null"}]},
+    "error": {"anyOf": [{"$ref": "#/$defs/error"}, {"type": "null"}]},
+    "provenance": {"anyOf": [{"$ref": "#/$defs/provenance"}, {"type": "null"}]}
+  },
+  "$defs": {
+    "uint64": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "positive_uint64": {"type": "integer", "minimum": 1, "maximum": 18446744073709551615},
+    "nullable_uint64": {"anyOf": [{"$ref": "#/$defs/uint64"}, {"type": "null"}]},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "nullable_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "git_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "case_id": {"type": "string", "pattern": "^case-[0-9a-f]{64}$"},
+    "strategy": {"enum": ["baseline", "one_shot", "swot"]},
+    "uint64_array": {"type": "array", "items": {"$ref": "#/$defs/uint64"}, "uniqueItems": true},
+    "nullable_boolean": {"type": ["boolean", "null"]},
+    "units": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data", "rate", "time"],
+      "properties": {
+        "data": {"const": "byte"},
+        "rate": {"const": "bit_per_second"},
+        "time": {"const": "picosecond"}
+      }
+    },
+    "run_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seed", "max_sim_time_ps", "max_events"],
+      "properties": {
+        "seed": {"$ref": "#/$defs/uint64"},
+        "max_sim_time_ps": {"$ref": "#/$defs/positive_uint64"},
+        "max_events": {"$ref": "#/$defs/positive_uint64"}
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["collective_start_ps", "collective_complete_ps", "simulated_cct_ps", "simulation_stop_ps"],
+      "properties": {
+        "collective_start_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "collective_complete_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "simulated_cct_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "simulation_stop_ps": {"$ref": "#/$defs/nullable_uint64"}
+      }
+    },
+    "traffic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expected_flow_count", "completed_flow_count", "expected_flow_group_count", "completed_flow_group_count", "expected_payload_bytes", "sent_payload_bytes", "received_payload_bytes", "wire_bytes", "logical_packet_count", "simulated_transit_unit_count", "processed_event_count", "drops", "duplicate_payload_bytes", "missing_payload_bytes", "in_flight_transit_unit_count", "unfinished_flow_ids", "per_rank_sent_payload_bytes", "per_rank_received_payload_bytes", "per_plane_payload_bytes"],
+      "properties": {
+        "expected_flow_count": {"$ref": "#/$defs/uint64"},
+        "completed_flow_count": {"$ref": "#/$defs/uint64"},
+        "expected_flow_group_count": {"$ref": "#/$defs/uint64"},
+        "completed_flow_group_count": {"$ref": "#/$defs/uint64"},
+        "expected_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "sent_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "received_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "wire_bytes": {"$ref": "#/$defs/uint64"},
+        "logical_packet_count": {"$ref": "#/$defs/uint64"},
+        "simulated_transit_unit_count": {"$ref": "#/$defs/uint64"},
+        "processed_event_count": {"$ref": "#/$defs/uint64"},
+        "drops": {"$ref": "#/$defs/uint64"},
+        "duplicate_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "missing_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "in_flight_transit_unit_count": {"$ref": "#/$defs/uint64"},
+        "unfinished_flow_ids": {"$ref": "#/$defs/uint64_array"},
+        "per_rank_sent_payload_bytes": {"type": "array", "items": {"$ref": "#/$defs/uint64"}},
+        "per_rank_received_payload_bytes": {"type": "array", "items": {"$ref": "#/$defs/uint64"}},
+        "per_plane_payload_bytes": {"type": "array", "items": {"$ref": "#/$defs/uint64"}}
+      }
+    },
+    "token_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token_id", "token_type", "producer_id", "status", "ready_ps"],
+      "properties": {
+        "token_id": {"$ref": "#/$defs/uint64"},
+        "token_type": {"enum": ["collective_start", "flow_group_complete", "step_complete"]},
+        "producer_id": {"$ref": "#/$defs/nullable_uint64"},
+        "status": {"enum": ["pending", "ready"]},
+        "ready_ps": {"$ref": "#/$defs/nullable_uint64"}
+      }
+    },
+    "step_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_id", "flow_group_ids", "completion_token_id", "expected_flow_group_count", "completed_flow_group_count", "first_flow_group_release_ps", "completion_ps", "status"],
+      "properties": {
+        "step_id": {"$ref": "#/$defs/uint64"},
+        "flow_group_ids": {"$ref": "#/$defs/uint64_array"},
+        "completion_token_id": {"$ref": "#/$defs/uint64"},
+        "expected_flow_group_count": {"$ref": "#/$defs/uint64"},
+        "completed_flow_group_count": {"$ref": "#/$defs/uint64"},
+        "first_flow_group_release_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "completion_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "status": {"enum": ["active", "complete", "failed", "pending"]}
+      }
+    },
+    "flow_group_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flow_group_id", "step_id", "plane_id", "program_epoch_id", "configuration_id", "physical_config_generation", "depends_on_token_ids", "flow_ids", "dependency_ready_ps", "release_ps", "completion_ps", "expected_flow_count", "completed_flow_count", "expected_payload_bytes", "sent_payload_bytes", "received_payload_bytes", "status"],
+      "properties": {
+        "flow_group_id": {"$ref": "#/$defs/uint64"},
+        "step_id": {"$ref": "#/$defs/uint64"},
+        "plane_id": {"$ref": "#/$defs/uint64"},
+        "program_epoch_id": {"$ref": "#/$defs/uint64"},
+        "configuration_id": {"$ref": "#/$defs/uint64"},
+        "physical_config_generation": {"$ref": "#/$defs/nullable_uint64"},
+        "depends_on_token_ids": {"$ref": "#/$defs/uint64_array"},
+        "flow_ids": {"$ref": "#/$defs/uint64_array"},
+        "dependency_ready_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "release_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "completion_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "expected_flow_count": {"$ref": "#/$defs/uint64"},
+        "completed_flow_count": {"$ref": "#/$defs/uint64"},
+        "expected_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "sent_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "received_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "status": {"enum": ["complete", "failed", "pending", "released"]}
+      }
+    },
+    "flow_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flow_id", "flow_group_id", "src_rank", "dst_rank", "payload_bytes", "release_ps", "last_payload_sent_ps", "last_payload_received_ps", "sent_payload_bytes", "received_payload_bytes", "logical_packet_count", "status"],
+      "properties": {
+        "flow_id": {"$ref": "#/$defs/uint64"},
+        "flow_group_id": {"$ref": "#/$defs/uint64"},
+        "src_rank": {"$ref": "#/$defs/uint64"},
+        "dst_rank": {"$ref": "#/$defs/uint64"},
+        "payload_bytes": {"$ref": "#/$defs/uint64"},
+        "release_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "last_payload_sent_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "last_payload_received_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "sent_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "received_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "logical_packet_count": {"$ref": "#/$defs/uint64"},
+        "status": {"enum": ["complete", "failed", "in_flight", "pending", "queued"]}
+      }
+    },
+    "busy_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_ps", "end_ps", "truncated_at_stop"],
+      "properties": {
+        "start_ps": {"$ref": "#/$defs/uint64"},
+        "end_ps": {"$ref": "#/$defs/uint64"},
+        "truncated_at_stop": {"type": "boolean"}
+      }
+    },
+    "source_port_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src_rank", "sent_payload_bytes", "logical_packet_count", "max_backlog_bytes", "busy_time_ps", "busy_intervals"],
+      "properties": {
+        "src_rank": {"$ref": "#/$defs/uint64"},
+        "sent_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "logical_packet_count": {"$ref": "#/$defs/uint64"},
+        "max_backlog_bytes": {"$ref": "#/$defs/uint64"},
+        "busy_time_ps": {"$ref": "#/$defs/uint64"},
+        "busy_intervals": {"type": "array", "items": {"$ref": "#/$defs/busy_interval"}}
+      }
+    },
+    "epoch_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["program_epoch_id", "transition", "configuration_id", "physical_config_generation", "path_prep_not_before_token_ids", "flow_group_ids", "path_prep_start_ps", "path_ready_ps", "reconfiguration_start_ps", "reconfiguration_end_ps", "transfer_start_ps", "transfer_complete_ps", "drain_complete_ps", "close_ps", "busy_time_ps", "max_serializer_backlog_bytes", "status"],
+      "properties": {
+        "program_epoch_id": {"$ref": "#/$defs/uint64"},
+        "transition": {"enum": ["initial", "reconfigure", "retain"]},
+        "configuration_id": {"$ref": "#/$defs/uint64"},
+        "physical_config_generation": {"$ref": "#/$defs/nullable_uint64"},
+        "path_prep_not_before_token_ids": {"$ref": "#/$defs/uint64_array"},
+        "flow_group_ids": {"$ref": "#/$defs/uint64_array"},
+        "path_prep_start_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "path_ready_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "reconfiguration_start_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "reconfiguration_end_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "transfer_start_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "transfer_complete_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "drain_complete_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "close_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "busy_time_ps": {"$ref": "#/$defs/uint64"},
+        "max_serializer_backlog_bytes": {"$ref": "#/$defs/uint64"},
+        "status": {"enum": ["active", "closed", "draining", "failed", "path_preparing", "path_ready", "pending"]}
+      }
+    },
+    "plane_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plane_id", "expected_payload_bytes", "sent_payload_bytes", "received_payload_bytes", "busy_time_ps", "max_serializer_backlog_bytes", "source_ports", "epochs"],
+      "properties": {
+        "plane_id": {"$ref": "#/$defs/uint64"},
+        "expected_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "sent_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "received_payload_bytes": {"$ref": "#/$defs/uint64"},
+        "busy_time_ps": {"$ref": "#/$defs/uint64"},
+        "max_serializer_backlog_bytes": {"$ref": "#/$defs/uint64"},
+        "source_ports": {"type": "array", "items": {"$ref": "#/$defs/source_port_result"}},
+        "epochs": {"type": "array", "items": {"$ref": "#/$defs/epoch_result"}}
+      }
+    },
+    "invariants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["all_steps_complete", "all_flow_groups_complete", "all_flows_exact_bytes", "all_routes_match_configuration", "all_dependency_tokens_respected", "all_program_epochs_respected", "all_physical_generations_respected", "no_same_plane_transfer_reconfiguration_overlap", "path_preparation_policy_respected", "no_cross_plane_reconfiguration_blocking", "no_unexpected_drop", "result_aggregates_match_details"],
+      "properties": {
+        "all_steps_complete": {"$ref": "#/$defs/nullable_boolean"},
+        "all_flow_groups_complete": {"$ref": "#/$defs/nullable_boolean"},
+        "all_flows_exact_bytes": {"$ref": "#/$defs/nullable_boolean"},
+        "all_routes_match_configuration": {"$ref": "#/$defs/nullable_boolean"},
+        "all_dependency_tokens_respected": {"$ref": "#/$defs/nullable_boolean"},
+        "all_program_epochs_respected": {"$ref": "#/$defs/nullable_boolean"},
+        "all_physical_generations_respected": {"$ref": "#/$defs/nullable_boolean"},
+        "no_same_plane_transfer_reconfiguration_overlap": {"$ref": "#/$defs/nullable_boolean"},
+        "path_preparation_policy_respected": {"$ref": "#/$defs/nullable_boolean"},
+        "no_cross_plane_reconfiguration_blocking": {"$ref": "#/$defs/nullable_boolean"},
+        "no_unexpected_drop": {"$ref": "#/$defs/nullable_boolean"},
+        "result_aggregates_match_details": {"$ref": "#/$defs/nullable_boolean"}
+      }
+    },
+    "blocked_plane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plane_id", "state", "program_cursor", "active_program_epoch_id", "active_configuration_id", "physical_config_generation", "serializer_backlog_flow_count", "in_flight_transit_unit_count", "pending_path_prep_token_ids"],
+      "properties": {
+        "plane_id": {"$ref": "#/$defs/uint64"},
+        "state": {"enum": ["active_epoch", "draining_epoch", "failed", "initializing", "program_complete", "ready_reserved", "reconfiguring"]},
+        "program_cursor": {"$ref": "#/$defs/uint64"},
+        "active_program_epoch_id": {"$ref": "#/$defs/nullable_uint64"},
+        "active_configuration_id": {"$ref": "#/$defs/nullable_uint64"},
+        "physical_config_generation": {"$ref": "#/$defs/nullable_uint64"},
+        "serializer_backlog_flow_count": {"$ref": "#/$defs/uint64"},
+        "in_flight_transit_unit_count": {"$ref": "#/$defs/uint64"},
+        "pending_path_prep_token_ids": {"$ref": "#/$defs/uint64_array"}
+      }
+    },
+    "blocked_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unfinished_token_ids", "unfinished_step_ids", "unfinished_flow_group_ids", "unfinished_flow_ids", "next_event_time_ps", "planes"],
+      "properties": {
+        "unfinished_token_ids": {"$ref": "#/$defs/uint64_array"},
+        "unfinished_step_ids": {"$ref": "#/$defs/uint64_array"},
+        "unfinished_flow_group_ids": {"$ref": "#/$defs/uint64_array"},
+        "unfinished_flow_ids": {"$ref": "#/$defs/uint64_array"},
+        "next_event_time_ps": {"$ref": "#/$defs/nullable_uint64"},
+        "planes": {"type": "array", "items": {"$ref": "#/$defs/blocked_plane"}}
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error_code", "json_pointer", "message", "entity_type", "entity_id", "plane_id"],
+      "properties": {
+        "error_code": {"type": "string", "minLength": 1},
+        "json_pointer": {
+          "anyOf": [
+            {"type": "string", "pattern": "^(?:|(?:/(?:[^~/]|~[01])*)+)$"},
+            {"type": "null"}
+          ]
+        },
+        "message": {"type": "string", "minLength": 1},
+        "entity_type": {"enum": ["flow", "flow_group", "none", "plane_epoch", "step"]},
+        "entity_id": {"$ref": "#/$defs/nullable_uint64"},
+        "plane_id": {"$ref": "#/$defs/nullable_uint64"}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["htsim_ocs_version", "htsim_upstream_git_sha", "htsim_local_patchset_sha256", "parent_build_commit", "compiler_id", "build_flags_sha256", "plan_schema_id", "plan_schema_sha256", "result_schema_id", "result_schema_sha256", "exact_coalesced_equivalence_version"],
+      "properties": {
+        "htsim_ocs_version": {"type": "string", "minLength": 1},
+        "htsim_upstream_git_sha": {"$ref": "#/$defs/git_sha"},
+        "htsim_local_patchset_sha256": {"$ref": "#/$defs/sha256"},
+        "parent_build_commit": {"$ref": "#/$defs/git_sha"},
+        "compiler_id": {"type": "string", "minLength": 1},
+        "build_flags_sha256": {"$ref": "#/$defs/sha256"},
+        "plan_schema_id": {"const": "swot-execution-plan/v2"},
+        "plan_schema_sha256": {"$ref": "#/$defs/sha256"},
+        "result_schema_id": {"const": "swot-simulation-result/v2"},
+        "result_schema_sha256": {"$ref": "#/$defs/sha256"},
+        "exact_coalesced_equivalence_version": {"type": ["string", "null"], "minLength": 1}
+      }
+    }
+  }
+}

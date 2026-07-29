@@ -1684,6 +1684,7 @@ name = "overlap4ocs"
 version = "0.0.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "jsonschema" },
     { name = "matplotlib" },
     { name = "networkx" },
     { name = "pulp" },
@@ -1707,6 +1708,7 @@ notebook = [
 requires-dist = [
     { name = "gurobipy", marker = "extra == 'gurobi'", specifier = "==12.0.1" },
     { name = "ipykernel", marker = "extra == 'notebook'" },
+    { name = "jsonschema", specifier = "==4.25.1" },
     { name = "jupyter", marker = "extra == 'notebook'" },
     { name = "matplotlib", specifier = "==3.10.1" },
     { name = "networkx", specifier = "==3.4.2" },

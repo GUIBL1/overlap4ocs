@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "htsim-ocs-operation-event/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_index", "time_ps", "event_type", "plane_id", "program_epoch_id", "physical_config_generation", "configuration_id", "step_id", "flow_group_id", "flow_id", "token_id", "reason_code"],
+  "properties": {
+    "schema_version": {"const": "htsim-ocs-operation-event/v1"},
+    "event_index": {"$ref": "#/$defs/uint64"},
+    "time_ps": {"$ref": "#/$defs/uint64"},
+    "event_type": {"enum": ["blocked_guard_snapshot", "epoch_close", "epoch_open", "flow_complete", "flow_last_sent", "group_complete", "group_release", "lockstep_all_paths_ready", "path_prep_start", "path_ready", "reconfiguration_end", "reconfiguration_start", "simulation_complete", "step_complete", "token_ready"]},
+    "plane_id": {"$ref": "#/$defs/nullable_uint64"},
+    "program_epoch_id": {"$ref": "#/$defs/nullable_uint64"},
+    "physical_config_generation": {"$ref": "#/$defs/nullable_uint64"},
+    "configuration_id": {"$ref": "#/$defs/nullable_uint64"},
+    "step_id": {"$ref": "#/$defs/nullable_uint64"},
+    "flow_group_id": {"$ref": "#/$defs/nullable_uint64"},
+    "flow_id": {"$ref": "#/$defs/nullable_uint64"},
+    "token_id": {"$ref": "#/$defs/nullable_uint64"},
+    "reason_code": {"type": ["string", "null"], "minLength": 1}
+  },
+  "$defs": {
+    "uint64": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "nullable_uint64": {"anyOf": [{"$ref": "#/$defs/uint64"}, {"type": "null"}]}
+  }
+}
