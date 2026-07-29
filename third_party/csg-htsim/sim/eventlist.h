@@ -2,6 +2,8 @@
 #ifndef EVENTLIST_H
 #define EVENTLIST_H
 
+#include <deque>
+#include <stdint.h>
 #include <map>
 #include <sys/time.h>
 #include "config.h"
@@ -23,7 +25,8 @@ protected:
 
 class EventList {
 public:
-    typedef multimap <simtime_picosec, EventSource*>::iterator Handle;
+    typedef pair<simtime_picosec, uint64_t> EventKey;
+    typedef map<EventKey, EventSource*>::iterator Handle;
     EventList();
     static void setEndtime(simtime_picosec endtime); // end simulation at endtime (rather than forever)
     static bool doNextEvent(); // returns true if it did anything, false if there's nothing to do
@@ -39,6 +42,12 @@ public:
     static void reschedulePendingSource(EventSource &src, simtime_picosec when);
     static void triggerIsPending(TriggerTarget &target);
     static inline simtime_picosec now() {return EventList::_lasteventtime;}
+    static uint64_t processedEventCount() {return _processed_event_count;}
+    static size_t pendingTimedEventCount() {return _pendingsources.size();}
+    static size_t pendingTriggerCount() {return _pending_triggers.size();}
+    // Returns the inclusive dispatch time of the next callback. Immediate
+    // triggers are observable at now(), before any timed event.
+    static bool nextEventTime(simtime_picosec& when);
     static Handle nullHandle() {return _pendingsources.end();}
 
 
@@ -49,9 +58,14 @@ public:
 private:
     static simtime_picosec _endtime;
     static simtime_picosec _lasteventtime;
-    typedef multimap <simtime_picosec, EventSource*> pendingsources_t;
+    typedef map<EventKey, EventSource*> pendingsources_t;
     static pendingsources_t _pendingsources;
-    static vector <TriggerTarget*> _pending_triggers;
+    static deque<TriggerTarget*> _pending_triggers;
+    static uint64_t _next_insertion_order;
+    static uint64_t _processed_event_count;
+
+    static EventKey nextKey(simtime_picosec when);
+    static void recordDispatch();
 
     static int _instanceCount;
     static EventList* _theEventList;

@@ -1,6 +1,8 @@
 #ifndef OVERLAP4OCS_HTSIM_OCS_VERSION_H
 #define OVERLAP4OCS_HTSIM_OCS_VERSION_H
 
+#include "generated_contract.h"
+
 #ifndef HTSIM_OCS_PARENT_BUILD_COMMIT
 #define HTSIM_OCS_PARENT_BUILD_COMMIT "unknown"
 #endif
@@ -15,9 +17,9 @@
 
 namespace htsim_ocs::version {
 
-inline constexpr char kProgram[] = "0.1.0";
-inline constexpr char kExecutionPlanSchema[] = "swot-execution-plan/v2";
-inline constexpr char kResultSchema[] = "swot-simulation-result/v2";
+inline constexpr char kProgram[] = "0.2.0";
+inline constexpr const char* kExecutionPlanSchema = contract::kPlanSchemaId;
+inline constexpr const char* kResultSchema = contract::kResultSchemaId;
 inline constexpr char kHtsimUpstreamCommit[] =
     "841d9e7be46bb968eece766aa4b6c044c7799f67";
 inline constexpr char kLocalPatchsetSha256[] =

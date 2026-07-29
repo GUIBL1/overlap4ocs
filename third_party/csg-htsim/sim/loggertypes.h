@@ -35,7 +35,7 @@ private:
 class Logged {
  public:
     typedef uint32_t id_t;
-    Logged(const string& name) {_name=name; _log_id=LASTIDNUM; Logged::LASTIDNUM++; _logged_manager.add_logged(this);}
+    Logged(const string& name) {_name=name; _log_id=LASTIDNUM; Logged::LASTIDNUM++; logged_manager().add_logged(this);}
     virtual ~Logged() {}
     virtual void setName(const string& name) { _name=name; }
     virtual const string& str() { return _name; };
@@ -43,10 +43,18 @@ class Logged {
     // usually things get their own IDs, but flows, for example, get associated with the sender ID
     void set_id(id_t id) {assert(id < LASTIDNUM); _log_id = id;}
     string _name;
-    static void dump_idmap() {_logged_manager.dump_idmap();}
+    static void dump_idmap() {logged_manager().dump_idmap();}
  private:
+    // Function-local initialization makes registration safe for Logged
+    // instances constructed in other translation units during startup.
+    static LoggedManager& logged_manager() {
+        static LoggedManager manager;
+        return manager;
+    }
     id_t _log_id;
     static id_t LASTIDNUM;
+    // Retained for source compatibility with the fixed upstream loggers.cpp.
+    // OCS code registers through logged_manager() above.
     static LoggedManager _logged_manager;
 };
 
