@@ -33,6 +33,17 @@ PARSER_OBJECTS := \
 	$(BUILD_DIR)/sha256.o \
 	$(BUILD_DIR)/ocs_execution_plan.o \
 	$(BUILD_DIR)/ocs_plan_parser.o
+DATAPLANE_OBJECTS := \
+	$(BUILD_DIR)/ocs_packet_flow_bridge.o \
+	$(BUILD_DIR)/ocs_packet.o \
+	$(BUILD_DIR)/ocs_flow.o \
+	$(BUILD_DIR)/ocs_execution_mode.o \
+	$(BUILD_DIR)/ocs_switch.o \
+	$(BUILD_DIR)/ocs_sink.o \
+	$(BUILD_DIR)/ocs_route_table.o \
+	$(BUILD_DIR)/ocs_port_serializer.o \
+	$(BUILD_DIR)/ocs_plane_dataplane.o \
+	$(BUILD_DIR)/ocs_topology.o
 CLI_OBJECT := $(BUILD_DIR)/main_ocs.o
 
 TARGET := $(BUILD_DIR)/htsim_ocs
@@ -40,14 +51,19 @@ LINK_CLOSURE_TEST := $(BUILD_DIR)/test_link_closure
 EVENTLIST_TEST := $(BUILD_DIR)/test_eventlist_order
 PARSER_TEST := $(BUILD_DIR)/test_plan_parser
 SHA256_TEST := $(BUILD_DIR)/test_sha256
+PACKET_ADAPTER_TEST := $(BUILD_DIR)/test_packet_adapter
+ROUTE_HANDOFF_TEST := $(BUILD_DIR)/test_route_handoff
+STATIC_DATAPLANE_TEST := $(BUILD_DIR)/test_static_dataplane
 TEST_RUNNER_ARGS ?=
 
 .PHONY: all clean test test-link-closure test-eventlist test-parser \
+	test-packet-adapter test-dataplane test-coalesced-equivalence \
 	check-link-closure check-vendor core-link-probe
 
 all: $(TARGET)
 
-$(TARGET): $(SHIM_OBJECT) $(CORE_OBJECTS) $(PARSER_OBJECTS) $(CLI_OBJECT)
+$(TARGET): $(SHIM_OBJECT) $(CORE_OBJECTS) $(PARSER_OBJECTS) \
+	$(DATAPLANE_OBJECTS) $(CLI_OBJECT)
 	$(CXX) $(LDFLAGS) -Wl,-Map,$(BUILD_DIR)/htsim_ocs.map -o $@ $^ $(LDLIBS)
 
 $(LINK_CLOSURE_TEST): $(SHIM_OBJECT) $(CORE_OBJECTS) $(BUILD_DIR)/test_link_closure.o
@@ -60,6 +76,21 @@ $(PARSER_TEST): $(PARSER_OBJECTS) $(BUILD_DIR)/test_plan_parser.o
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 $(SHA256_TEST): $(BUILD_DIR)/sha256.o $(BUILD_DIR)/test_sha256.o
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+
+$(PACKET_ADAPTER_TEST): $(SHIM_OBJECT) $(CORE_OBJECTS) \
+	$(BUILD_DIR)/ocs_packet_flow_bridge.o $(BUILD_DIR)/ocs_packet.o \
+	$(BUILD_DIR)/ocs_flow.o \
+	$(BUILD_DIR)/test_packet_adapter.o
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+
+$(ROUTE_HANDOFF_TEST): $(SHIM_OBJECT) $(CORE_OBJECTS) \
+	$(BUILD_DIR)/ocs_packet_flow_bridge.o $(BUILD_DIR)/ocs_packet.o \
+	$(BUILD_DIR)/ocs_switch.o $(BUILD_DIR)/test_route_handoff.o
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+
+$(STATIC_DATAPLANE_TEST): $(SHIM_OBJECT) $(CORE_OBJECTS) $(PARSER_OBJECTS) \
+	$(DATAPLANE_OBJECTS) $(BUILD_DIR)/test_static_dataplane.o
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 $(GENERATED_CONTRACT): tools/generate_contract_header.py \
@@ -97,6 +128,16 @@ $(BUILD_DIR)/test_plan_parser.o: tests/test_plan_parser.cpp $(GENERATED_CONTRACT
 $(BUILD_DIR)/test_sha256.o: tests/test_sha256.cpp | $(BUILD_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
+$(BUILD_DIR)/test_packet_adapter.o: tests/test_packet_adapter.cpp | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
+
+$(BUILD_DIR)/test_route_handoff.o: tests/test_route_handoff.cpp | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
+
+$(BUILD_DIR)/test_static_dataplane.o: tests/test_static_dataplane.cpp \
+	$(GENERATED_CONTRACT) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
+
 $(BUILD_DIR)/core/%.o: $(HTSIM_SIM_DIR)/%.cpp | $(BUILD_DIR)/core
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
@@ -125,6 +166,21 @@ test-parser: $(PARSER_TEST) $(SHA256_TEST)
 	$(SHA256_TEST)
 	$(PARSER_TEST) $(ROOT_DIR)
 
+test-packet-adapter: $(PACKET_ADAPTER_TEST) $(ROUTE_HANDOFF_TEST)
+	$(PACKET_ADAPTER_TEST)
+	@for case_name in accepted wrong-dst wrong-config wrong-epoch \
+		wrong-generation wrong-plane time-overflow; do \
+		$(ROUTE_HANDOFF_TEST) $$case_name || exit 1; \
+	done
+
+test-dataplane: $(STATIC_DATAPLANE_TEST)
+	$(PYTHON) tests/run_dataplane_tests.py \
+		--binary $(STATIC_DATAPLANE_TEST) --suite dataplane
+
+test-coalesced-equivalence: $(STATIC_DATAPLANE_TEST)
+	$(PYTHON) tests/run_dataplane_tests.py \
+		--binary $(STATIC_DATAPLANE_TEST) --suite equivalence
+
 check-link-closure: all $(LINK_CLOSURE_TEST)
 	$(PYTHON) tests/run_tests.py \
 		--binary $(TARGET) \
@@ -133,7 +189,8 @@ check-link-closure: all $(LINK_CLOSURE_TEST)
 		--probe-link-map $(BUILD_DIR)/test_link_closure.map \
 		$(TEST_RUNNER_ARGS)
 
-test: all test-link-closure test-eventlist test-parser check-link-closure
+test: all test-link-closure test-eventlist test-parser test-packet-adapter \
+	test-dataplane test-coalesced-equivalence check-link-closure
 
 check-vendor: all
 	$(PYTHON) tests/run_tests.py --check-vendor --binary $(TARGET)
@@ -143,5 +200,8 @@ clean:
 
 -include $(CLI_OBJECT:.o=.d) $(SHIM_OBJECT:.o=.d) \
 	$(CORE_OBJECTS:.o=.d) $(PARSER_OBJECTS:.o=.d) \
+	$(DATAPLANE_OBJECTS:.o=.d) \
 	$(BUILD_DIR)/test_link_closure.d $(BUILD_DIR)/test_eventlist_order.d \
-	$(BUILD_DIR)/test_plan_parser.d $(BUILD_DIR)/test_sha256.d
+	$(BUILD_DIR)/test_plan_parser.d $(BUILD_DIR)/test_sha256.d \
+	$(BUILD_DIR)/test_packet_adapter.d $(BUILD_DIR)/test_route_handoff.d \
+	$(BUILD_DIR)/test_static_dataplane.d
