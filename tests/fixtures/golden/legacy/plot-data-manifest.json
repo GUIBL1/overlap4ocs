@@ -1,0 +1,68 @@
+{
+  "schema_version": "overlap4ocs-legacy-plot-data-golden/v1",
+  "metric_source": "legacy_math_model",
+  "input_artifacts": {
+    "runtime_results_csv_sha256": "d173c5230d7698de1b6b3c644e7c86f408cb36452514cfbf1d3faa7d12338752",
+    "runtime_metrics_json_sha256": "6401963d824254c8e56ebf9750922df5f2bf59d8f92367a9ca0cc61767517832",
+    "prepare_script_sha256": "101e0b12d76021374cf67bee248ccb4e08dc77719c3a2b829c982a95f534807c",
+    "plot_script_sha256": "75db0dee3c6a529ac6407bc4e86e0fb9ef059f060e33920a868dbdc6debd7bf7"
+  },
+  "projection": {
+    "x_column": "message_mib",
+    "x_values": [
+      0.125
+    ],
+    "x_legacy_label": "128KB",
+    "y_unit": "millisecond",
+    "series": [
+      {
+        "name": "SWOT",
+        "column": "optimized_cct",
+        "values": [
+          0.0846874999999999
+        ]
+      },
+      {
+        "name": "Strawman-ICR",
+        "column": "baseline_cct",
+        "values": [
+          0.681171875
+        ]
+      },
+      {
+        "name": "One-shot",
+        "column": "oneshot_cct",
+        "values": [
+          0.0846874999999999
+        ]
+      },
+      {
+        "name": "Ideal",
+        "column": "ideal_cct",
+        "values": [
+          0.081171875
+        ]
+      }
+    ]
+  },
+  "legacy_fig9_selector": {
+    "scope": "per_series_per_message",
+    "metric": "realized_legacy_cct",
+    "swot": "min(optimized_cct)",
+    "strawman": "min(baseline_cct)",
+    "one_shot": "min(non_null_oneshot_cct)",
+    "ideal": "min(ideal_cct)",
+    "label_source": "swot_selected_algorithm",
+    "gain_formula": "(min(strawman,one_shot)/swot-1)*100",
+    "target_status": "D18_accepted_baseline_selected_shared_algorithm"
+  },
+  "legacy_fig11": {
+    "formula": "(baseline_cct-ideal_cct)/baseline_cct*100",
+    "panel_reconfiguration_delay_ms": [
+      0.2,
+      2.0,
+      20.0
+    ],
+    "target_status": "D20_accepted_legacy_strawman_fraction_v1_D21_accepted_four_panels"
+  }
+}

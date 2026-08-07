@@ -1,0 +1,1 @@
+D01 uses decimal MB (1,000,000 bytes). Fig.5 fixes p=8, k=2, 400 Gbps per plane, 200 us reconfiguration, and zero data latency. SWOT assigns step bytes by plane as (15,5), (0,10), (5,0), (5,0), (0,10), (15,5) MB; plane 0 bypasses P2 and plane 1 bypasses P3, giving exactly 1,200,000,000 ps.

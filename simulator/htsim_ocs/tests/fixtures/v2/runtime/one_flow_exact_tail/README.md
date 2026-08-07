@@ -1,0 +1,1 @@
+The four independent source ports send 1, MTU-1, MTU, and MTU+1 bytes. The oracle uses ceil(payload/1500), exact non-zero tail payload, ceil(8*bytes/rate) serialization, and one 37 ps forward latency.

@@ -1,0 +1,1 @@
+D01 uses decimal MB (1,000,000 bytes). Fig.5 fixes p=8, k=2, 400 Gbps per plane, 200 us reconfiguration, and zero data latency. Strawman splits 20,10,5,5,10,20 MB evenly and applies four synchronous 200 us transitions, giving 700 us transmission + 800 us reconfiguration = exactly 1,500,000,000 ps.

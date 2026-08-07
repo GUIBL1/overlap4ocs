@@ -1,0 +1,1 @@
+scale_p256_k8_512mb_per_rank is an exact-coalesced structural/resource gate. The manifest event and transit-unit ceilings are captured as strict deterministic upper bounds and payload size never controls object allocation.

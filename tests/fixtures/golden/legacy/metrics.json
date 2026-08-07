@@ -1,0 +1,67 @@
+{
+  "schema_version": "overlap4ocs-legacy-phase00-golden/v1",
+  "evidence_date": "2026-07-27",
+  "metric_source": "legacy_math_model",
+  "provenance": {
+    "parent_commit": "8711aff6133d618da73e44b2c2cc68c78b6dcab1",
+    "matrix_id": "exp1.1-hd+bruck-1",
+    "case_hash_sha1": "a24d22a6f6b3e874bc32da03b202f466c85d4a98",
+    "matrix_source_sha256": "ccdd02add4da8388e794b96c53ec6c660b9c6b9c55623b9f27ced3876d83ea2b",
+    "generated_instance_sha256": "735262e8ec568cea66af6eae379682a9c367f82169375e1475e56e88fff1536e",
+    "runtime_metrics_sha256": "6401963d824254c8e56ebf9750922df5f2bf59d8f92367a9ca0cc61767517832",
+    "runtime_results_csv_sha256": "d173c5230d7698de1b6b3c644e7c86f408cb36452514cfbf1d3faa7d12338752",
+    "runtime_log_sha256": "7f29ca10a1397aa56b019c8811b2be3a99fe30674ddcc3e4b78f84c3845b0006",
+    "optimized_solution_sha256": "b04d204c4eaa8f11332e4b3491aa28a638618e4176df4090d60d150e315b58e6"
+  },
+  "normalized_legacy_instance": {
+    "algorithm": "rs_having-doubling",
+    "p": 16,
+    "k": 4,
+    "B": 25,
+    "T_reconf": 0.2,
+    "T_lat": 0.02,
+    "m": 0.125,
+    "num_steps": 4,
+    "m_i": [
+      0.0625,
+      0.03125,
+      0.015625,
+      0.0078125
+    ],
+    "configurations": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "numeric_unit_status": "D01_accepted_decimal_MB",
+    "time_unit": "millisecond",
+    "cct_unit": "millisecond"
+  },
+  "solver": {
+    "frontend": "PuLP",
+    "frontend_version": "3.3.0",
+    "backend": "CBC",
+    "backend_version": "2.10.3",
+    "status": "Optimal",
+    "relative_gap_limit": 0.05,
+    "time_limit_seconds": 120,
+    "raw_objective_ms": 0.2846875,
+    "best_bound_ms": 0.2846875,
+    "observed_relative_gap": 0.0,
+    "warm_start_applied": true,
+    "warm_start_source": "one-shot",
+    "warm_start_fallback_used": false
+  },
+  "legacy_cct_ms": {
+    "optimized_cct": 0.08468749999999997,
+    "baseline_cct": 0.681171875,
+    "oneshot_cct": 0.08468749999999997,
+    "ideal_cct": 0.081171875
+  },
+  "legacy_postprocessing": {
+    "subtracted_reconfiguration_delay_ms": 0.2,
+    "optimized_before_subtraction_ms": 0.2846875,
+    "plot_clamp_applied_to_this_fixture": false
+  }
+}

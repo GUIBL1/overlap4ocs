@@ -1,0 +1,1 @@
+one_shot_static_preinstalled is a static Phase 06 semantic oracle. Counts, byte totals, dependency tokens, and plane epochs are enumerated in manifest.json; timing is checked at integer picosecond precision.

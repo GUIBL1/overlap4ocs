@@ -1,0 +1,1 @@
+failure_state_projection is a static Phase 06 semantic oracle. Counts, byte totals, dependency tokens, and plane epochs are enumerated in manifest.json; timing is checked at integer picosecond precision.
