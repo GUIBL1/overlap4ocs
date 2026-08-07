@@ -20,10 +20,12 @@ std::uint64_t checked_accumulate(std::uint64_t current, std::uint64_t increment,
 }  // namespace
 
 OcsFlow::OcsFlow(const OcsFlowSpec& spec, OcsFlowRuntimeIdentity identity,
-                 OcsFlowCompletionCallback completion_callback)
+                 OcsFlowCompletionCallback completion_callback,
+                 OcsFlowLastSentCallback last_sent_callback)
     : spec_(spec),
       identity_(identity),
-      completion_callback_(std::move(completion_callback)) {}
+      completion_callback_(std::move(completion_callback)),
+      last_sent_callback_(std::move(last_sent_callback)) {}
 
 void OcsFlow::mark_released(std::uint64_t release_ps) {
     if (release_ps_.has_value()) {
@@ -56,6 +58,9 @@ void OcsFlow::note_sent(std::uint64_t byte_offset, std::uint64_t payload_bytes,
         "flow_packet_count_overflow", "flow logical packet counter overflow");
     tail_payload_bytes_ = tail_payload_bytes;
     last_payload_sent_ps_ = last_payload_sent_ps;
+    if (sent_payload_bytes_ == spec_.payload_bytes && last_sent_callback_) {
+        last_sent_callback_(stats());
+    }
 }
 
 void OcsFlow::note_received(std::uint64_t byte_offset,

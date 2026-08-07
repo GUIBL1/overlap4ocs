@@ -44,6 +44,16 @@ DATAPLANE_OBJECTS := \
 	$(BUILD_DIR)/ocs_port_serializer.o \
 	$(BUILD_DIR)/ocs_plane_dataplane.o \
 	$(BUILD_DIR)/ocs_topology.o
+RUNTIME_OBJECTS := \
+	$(BUILD_DIR)/ocs_trace_collector.o \
+	$(BUILD_DIR)/ocs_flow_group.o \
+	$(BUILD_DIR)/ocs_dependency_tracker.o \
+	$(BUILD_DIR)/ocs_program_epoch.o \
+	$(BUILD_DIR)/ocs_reconfiguration.o \
+	$(BUILD_DIR)/ocs_plane_runtime.o \
+	$(BUILD_DIR)/ocs_guards.o \
+	$(BUILD_DIR)/ocs_watchdog.o \
+	$(BUILD_DIR)/ocs_coordinator.o
 CLI_OBJECT := $(BUILD_DIR)/main_ocs.o
 
 TARGET := $(BUILD_DIR)/htsim_ocs
@@ -54,16 +64,18 @@ SHA256_TEST := $(BUILD_DIR)/test_sha256
 PACKET_ADAPTER_TEST := $(BUILD_DIR)/test_packet_adapter
 ROUTE_HANDOFF_TEST := $(BUILD_DIR)/test_route_handoff
 STATIC_DATAPLANE_TEST := $(BUILD_DIR)/test_static_dataplane
+RUNTIME_DRIVER_TEST := $(BUILD_DIR)/test_runtime_driver
 TEST_RUNNER_ARGS ?=
 
 .PHONY: all clean test test-link-closure test-eventlist test-parser \
 	test-packet-adapter test-dataplane test-coalesced-equivalence \
+	test-epoch test-dependencies test-path-policies test-watchdog \
 	check-link-closure check-vendor core-link-probe
 
 all: $(TARGET)
 
 $(TARGET): $(SHIM_OBJECT) $(CORE_OBJECTS) $(PARSER_OBJECTS) \
-	$(DATAPLANE_OBJECTS) $(CLI_OBJECT)
+	$(DATAPLANE_OBJECTS) $(RUNTIME_OBJECTS) $(CLI_OBJECT)
 	$(CXX) $(LDFLAGS) -Wl,-Map,$(BUILD_DIR)/htsim_ocs.map -o $@ $^ $(LDLIBS)
 
 $(LINK_CLOSURE_TEST): $(SHIM_OBJECT) $(CORE_OBJECTS) $(BUILD_DIR)/test_link_closure.o
@@ -91,6 +103,11 @@ $(ROUTE_HANDOFF_TEST): $(SHIM_OBJECT) $(CORE_OBJECTS) \
 
 $(STATIC_DATAPLANE_TEST): $(SHIM_OBJECT) $(CORE_OBJECTS) $(PARSER_OBJECTS) \
 	$(DATAPLANE_OBJECTS) $(BUILD_DIR)/test_static_dataplane.o
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+
+$(RUNTIME_DRIVER_TEST): $(SHIM_OBJECT) $(CORE_OBJECTS) $(PARSER_OBJECTS) \
+	$(DATAPLANE_OBJECTS) $(RUNTIME_OBJECTS) \
+	$(BUILD_DIR)/test_runtime_driver.o
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 $(GENERATED_CONTRACT): tools/generate_contract_header.py \
@@ -138,6 +155,10 @@ $(BUILD_DIR)/test_static_dataplane.o: tests/test_static_dataplane.cpp \
 	$(GENERATED_CONTRACT) | $(BUILD_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
+$(BUILD_DIR)/test_runtime_driver.o: tests/test_runtime_driver.cpp \
+	$(GENERATED_CONTRACT) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
+
 $(BUILD_DIR)/core/%.o: $(HTSIM_SIM_DIR)/%.cpp | $(BUILD_DIR)/core
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
@@ -181,6 +202,22 @@ test-coalesced-equivalence: $(STATIC_DATAPLANE_TEST)
 	$(PYTHON) tests/run_dataplane_tests.py \
 		--binary $(STATIC_DATAPLANE_TEST) --suite equivalence
 
+test-epoch: $(RUNTIME_DRIVER_TEST)
+	$(PYTHON) tests/run_runtime_tests.py \
+		--binary $(RUNTIME_DRIVER_TEST) --suite epoch
+
+test-dependencies: $(RUNTIME_DRIVER_TEST)
+	$(PYTHON) tests/run_runtime_tests.py \
+		--binary $(RUNTIME_DRIVER_TEST) --suite dependencies
+
+test-path-policies: $(RUNTIME_DRIVER_TEST)
+	$(PYTHON) tests/run_runtime_tests.py \
+		--binary $(RUNTIME_DRIVER_TEST) --suite path-policies
+
+test-watchdog: $(RUNTIME_DRIVER_TEST)
+	$(PYTHON) tests/run_runtime_tests.py \
+		--binary $(RUNTIME_DRIVER_TEST) --suite watchdog
+
 check-link-closure: all $(LINK_CLOSURE_TEST)
 	$(PYTHON) tests/run_tests.py \
 		--binary $(TARGET) \
@@ -190,7 +227,8 @@ check-link-closure: all $(LINK_CLOSURE_TEST)
 		$(TEST_RUNNER_ARGS)
 
 test: all test-link-closure test-eventlist test-parser test-packet-adapter \
-	test-dataplane test-coalesced-equivalence check-link-closure
+	test-dataplane test-coalesced-equivalence test-epoch test-dependencies \
+	test-path-policies test-watchdog check-link-closure
 
 check-vendor: all
 	$(PYTHON) tests/run_tests.py --check-vendor --binary $(TARGET)
@@ -200,8 +238,8 @@ clean:
 
 -include $(CLI_OBJECT:.o=.d) $(SHIM_OBJECT:.o=.d) \
 	$(CORE_OBJECTS:.o=.d) $(PARSER_OBJECTS:.o=.d) \
-	$(DATAPLANE_OBJECTS:.o=.d) \
+	$(DATAPLANE_OBJECTS:.o=.d) $(RUNTIME_OBJECTS:.o=.d) \
 	$(BUILD_DIR)/test_link_closure.d $(BUILD_DIR)/test_eventlist_order.d \
 	$(BUILD_DIR)/test_plan_parser.d $(BUILD_DIR)/test_sha256.d \
 	$(BUILD_DIR)/test_packet_adapter.d $(BUILD_DIR)/test_route_handoff.d \
-	$(BUILD_DIR)/test_static_dataplane.d
+	$(BUILD_DIR)/test_static_dataplane.d $(BUILD_DIR)/test_runtime_driver.d

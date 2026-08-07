@@ -220,6 +220,18 @@ void OcsPortSerializer::close_busy_interval() {
 
 void OcsPortSerializer::doNextEvent() { emit_pending_unit(); }
 
+void OcsPortSerializer::abort_pending() noexcept {
+    if (event_pending_) {
+        EventList::cancelPendingSource(*this);
+    }
+    queue_.clear();
+    pending_unit_.reset();
+    event_pending_ = false;
+    backlog_bytes_ = 0;
+    busy_start_ps_.reset();
+    cumulative_busy_payload_bytes_ = 0;
+}
+
 OcsSourcePortStats OcsPortSerializer::stats() const {
     return OcsSourcePortStats{plane_id_,
                               src_rank_,

@@ -33,12 +33,22 @@ ocs_route_table.o
 ocs_port_serializer.o
 ocs_plane_dataplane.o
 ocs_topology.o
+ocs_trace_collector.o
+ocs_flow_group.o
+ocs_dependency_tracker.o
+ocs_program_epoch.o
+ocs_reconfiguration.o
+ocs_plane_runtime.o
+ocs_guards.o
+ocs_watchdog.o
+ocs_coordinator.o
 main_ocs.o
 ```
 
-The Phase 4 objects implement the project-owned finite packet data plane; they
-add no vendored HTSim core translation unit. The link-closure probe replaces
-the parser/data-plane/CLI objects with
+The Phase 4 objects implement the project-owned finite packet data plane and
+the Phase 5 objects implement the independent epoch/dependency/path-policy
+runtime. They add no vendored HTSim core translation unit. The link-closure
+probe replaces the parser/data-plane/runtime/CLI objects with
 `test_link_closure.o` and proves one Packet traverses `Route -> Pipe -> sink`
 and is freed exactly once.
 

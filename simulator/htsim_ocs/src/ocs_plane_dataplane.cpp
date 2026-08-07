@@ -14,6 +14,33 @@
 #include "pipe.h"
 
 namespace htsim_ocs {
+namespace {
+
+class OcsOwnedPipe final : public Pipe {
+  public:
+    using Pipe::Pipe;
+
+    void abort_inflight(const std::function<void()>& transit_leave) noexcept {
+        EventList::cancelPendingSource(*this);
+        while (_count > 0) {
+            Packet* packet = _inflight_v[static_cast<std::size_t>(_next_pop)].pkt;
+            _next_pop = (_next_pop + 1) % _size;
+            --_count;
+            if (packet != nullptr) {
+                auto* unit = dynamic_cast<OcsTransitUnitView*>(packet);
+                if (unit != nullptr && unit->pool_active()) {
+                    packet->free();
+                }
+            }
+            if (transit_leave) {
+                transit_leave();
+            }
+        }
+        _next_insert = _next_pop;
+    }
+};
+
+}  // namespace
 
 OcsPlaneDataplane::OcsPlaneDataplane(
     EventList& event_list, std::uint64_t plane_id, std::uint64_t node_count,
@@ -37,7 +64,7 @@ OcsPlaneDataplane::OcsPlaneDataplane(
     pipe_ptrs.reserve(static_cast<std::size_t>(node_count_));
     sink_ptrs.reserve(static_cast<std::size_t>(node_count_));
     for (std::uint64_t dst = 0; dst < node_count_; ++dst) {
-        auto pipe = std::make_unique<Pipe>(data_latency_ps, event_list);
+        auto pipe = std::make_unique<OcsOwnedPipe>(data_latency_ps, event_list);
         std::ostringstream pipe_name;
         pipe_name << "ocs-pipe-plane-" << plane_id_ << "-dst-" << dst;
         pipe->forceName(pipe_name.str());
@@ -70,10 +97,6 @@ void OcsPlaneDataplane::activate_static_path(
     std::uint64_t program_epoch_id, std::uint64_t configuration_id,
     std::uint64_t physical_config_generation,
     const std::vector<std::uint64_t>& permutation) {
-    if (permutation.size() != node_count_) {
-        throw OcsDataplaneError("configuration_size_mismatch",
-                                "active permutation size does not match plane");
-    }
     if (switch_->installed() &&
         (switch_->program_epoch_id() != program_epoch_id ||
          switch_->configuration_id() != configuration_id ||
@@ -81,6 +104,29 @@ void OcsPlaneDataplane::activate_static_path(
              physical_config_generation)) {
         throw OcsDataplaneError("static_path_conflict",
                                 "static adapter cannot activate two plane states");
+    }
+    install_path(program_epoch_id, configuration_id,
+                 physical_config_generation, permutation);
+}
+
+void OcsPlaneDataplane::install_path(
+    std::uint64_t program_epoch_id, std::uint64_t configuration_id,
+    std::uint64_t physical_config_generation,
+    const std::vector<std::uint64_t>& permutation) {
+    if (permutation.size() != node_count_) {
+        throw OcsDataplaneError("configuration_size_mismatch",
+                                "active permutation size does not match plane");
+    }
+    if (switch_->installed() &&
+        switch_->program_epoch_id() == program_epoch_id &&
+        switch_->configuration_id() == configuration_id &&
+        switch_->physical_config_generation() ==
+            physical_config_generation) {
+        return;
+    }
+    if (!data_plane_idle()) {
+        throw OcsDataplaneError("epoch_violation",
+                                "cannot install a path while the plane is busy");
     }
     switch_->install(program_epoch_id, configuration_id,
                      physical_config_generation, permutation);
@@ -177,6 +223,47 @@ bool OcsPlaneDataplane::data_plane_idle() const noexcept {
                        [](const auto& serializer) {
                            return serializer->idle();
                        });
+}
+
+bool OcsPlaneDataplane::path_installed() const noexcept {
+    return switch_->installed();
+}
+
+std::uint64_t OcsPlaneDataplane::serializer_backlog_flow_count() const noexcept {
+    std::uint64_t total = 0;
+    for (const auto& serializer : serializers_) {
+        const auto count = static_cast<std::uint64_t>(
+            serializer->backlog_flow_count());
+        if (count > std::numeric_limits<std::uint64_t>::max() - total) {
+            return std::numeric_limits<std::uint64_t>::max();
+        }
+        total += count;
+    }
+    return total;
+}
+
+std::uint64_t OcsPlaneDataplane::serializer_backlog_bytes() const noexcept {
+    std::uint64_t total = 0;
+    for (const auto& serializer : serializers_) {
+        const std::uint64_t bytes = serializer->backlog_bytes();
+        if (bytes > std::numeric_limits<std::uint64_t>::max() - total) {
+            return std::numeric_limits<std::uint64_t>::max();
+        }
+        total += bytes;
+    }
+    return total;
+}
+
+void OcsPlaneDataplane::abort_pending() noexcept {
+    for (auto& serializer : serializers_) {
+        serializer->abort_pending();
+    }
+    for (auto& pipe : pipes_) {
+        auto* owned = dynamic_cast<OcsOwnedPipe*>(pipe.get());
+        if (owned != nullptr) {
+            owned->abort_inflight([this]() { transit_leave(); });
+        }
+    }
 }
 
 OcsPlaneDataplaneStats OcsPlaneDataplane::stats() const {

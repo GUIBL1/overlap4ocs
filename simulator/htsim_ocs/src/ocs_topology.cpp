@@ -23,7 +23,9 @@ void checked_audit_add(std::uint64_t& destination, std::uint64_t increment,
 OcsTopology::OcsTopology(EventList& event_list,
                          std::shared_ptr<const OcsExecutionPlanV2> plan,
                          OcsExecutionMode mode,
-                         OcsCapacityProof capacity_proof)
+                         OcsCapacityProof capacity_proof,
+                         FlowCallback flow_completion_callback,
+                         FlowCallback flow_last_sent_callback)
     : event_list_(event_list),
       plan_(std::move(plan)),
       mode_(mode),
@@ -31,6 +33,8 @@ OcsTopology::OcsTopology(EventList& event_list,
       flows_(plan_->flows.size()),
       selected_flows_(plan_->flows.size(), false),
       completed_flows_(plan_->flows.size(), false),
+      flow_completion_callback_(std::move(flow_completion_callback)),
+      flow_last_sent_callback_(std::move(flow_last_sent_callback)),
       processed_event_count_at_start_(EventList::processedEventCount()) {
     if (capacity_proof_.execution_mode != mode_ ||
         capacity_proof_.per_pipe_transit_unit_upper_bound.size() !=
@@ -38,6 +42,7 @@ OcsTopology::OcsTopology(EventList& event_list,
         throw OcsDataplaneError("capacity_proof_mismatch",
                                 "capacity proof does not match topology");
     }
+    materialize_all_flows();
     planes_.reserve(static_cast<std::size_t>(plan_->topology.plane_count));
     for (std::uint64_t plane_id = 0;
          plane_id < plan_->topology.plane_count; ++plane_id) {
@@ -53,15 +58,17 @@ OcsTopology::OcsTopology(EventList& event_list,
 
 OcsTopology::~OcsTopology() = default;
 
-void OcsTopology::materialize_group(const OcsFlowGroupSpec& group) {
-    OcsPlaneDataplane& plane = plane_by_id(group.plane_id);
-    const OcsConfiguration& configuration =
-        plan_->configuration_by_id(group.configuration_id);
+std::uint64_t OcsTopology::physical_generation_for_epoch(
+    std::uint64_t plane_id, std::uint64_t program_epoch_id) const {
     const OcsPlaneProgram& program =
-        plan_->plane_program_by_id(group.plane_id);
+        plan_->plane_program_by_id(plane_id);
+    if (program_epoch_id >= program.epochs.size()) {
+        throw OcsDataplaneError("unknown_program_epoch",
+                                "program epoch is outside the plane program");
+    }
     std::uint64_t physical_config_generation = 0;
     for (const OcsProgramEpochSpec& epoch : program.epochs) {
-        if (epoch.program_epoch_id > group.program_epoch_id) {
+        if (epoch.program_epoch_id > program_epoch_id) {
             break;
         }
         if (epoch.transition == "reconfigure") {
@@ -73,9 +80,59 @@ void OcsTopology::materialize_group(const OcsFlowGroupSpec& group) {
             }
         }
     }
-    plane.activate_static_path(group.program_epoch_id, group.configuration_id,
-                               physical_config_generation,
-                               configuration.permutation);
+    return physical_config_generation;
+}
+
+void OcsTopology::materialize_all_flows() {
+    for (const OcsFlowSpec& spec : plan_->flows) {
+        const OcsFlowGroupSpec& group =
+            plan_->flow_group_by_id(spec.flow_group_id);
+        const std::uint64_t generation = physical_generation_for_epoch(
+            group.plane_id, group.program_epoch_id);
+        flows_[static_cast<std::size_t>(spec.flow_id)] =
+            std::make_unique<OcsFlow>(
+                spec,
+                OcsFlowRuntimeIdentity{group.step_id, group.plane_id,
+                                       group.program_epoch_id,
+                                       group.configuration_id, generation},
+                [this](const OcsFlowStats& stats) {
+                    note_flow_complete(stats);
+                },
+                [this](const OcsFlowStats& stats) {
+                    note_flow_last_sent(stats);
+                });
+    }
+}
+
+void OcsTopology::install_epoch_path(std::uint64_t plane_id,
+                                     std::uint64_t program_epoch_id) {
+    const OcsPlaneProgram& program = plan_->plane_program_by_id(plane_id);
+    if (program_epoch_id >= program.epochs.size()) {
+        throw OcsDataplaneError("unknown_program_epoch",
+                                "program epoch is outside the plane program");
+    }
+    const OcsProgramEpochSpec& epoch =
+        program.epochs[static_cast<std::size_t>(program_epoch_id)];
+    const OcsConfiguration& configuration =
+        plan_->configuration_by_id(epoch.configuration_id);
+    plane_by_id(plane_id).install_path(
+        program_epoch_id, epoch.configuration_id,
+        physical_generation_for_epoch(plane_id, program_epoch_id),
+        configuration.permutation);
+}
+
+void OcsTopology::release_group(std::uint64_t flow_group_id) {
+    const OcsFlowGroupSpec& group = plan_->flow_group_by_id(flow_group_id);
+    OcsPlaneDataplane& plane = plane_by_id(group.plane_id);
+    const std::uint64_t generation = physical_generation_for_epoch(
+        group.plane_id, group.program_epoch_id);
+    if (!plane.path_installed() ||
+        plane.active_program_epoch_id() != group.program_epoch_id ||
+        plane.active_configuration_id() != group.configuration_id ||
+        plane.active_physical_config_generation() != generation) {
+        throw OcsDataplaneError("epoch_violation",
+                                "flow group path is not active");
+    }
 
     std::vector<OcsFlow*> group_flows;
     group_flows.reserve(group.flow_ids.size());
@@ -85,14 +142,6 @@ void OcsTopology::materialize_group(const OcsFlowGroupSpec& group) {
                                     "flow was selected by two static groups");
         }
         const OcsFlowSpec& spec = plan_->flow_by_id(flow_id);
-        flows_[static_cast<std::size_t>(flow_id)] = std::make_unique<OcsFlow>(
-            spec,
-            OcsFlowRuntimeIdentity{group.step_id,
-                                   group.plane_id,
-                                   group.program_epoch_id,
-                                   group.configuration_id,
-                                   physical_config_generation},
-            [this](const OcsFlowStats& stats) { note_flow_complete(stats); });
         selected_flows_[static_cast<std::size_t>(flow_id)] = true;
         checked_audit_add(selected_flow_count_, 1, "selected_flow_overflow");
         if (!checked_add_u64(selected_payload_bytes_, spec.payload_bytes,
@@ -103,6 +152,17 @@ void OcsTopology::materialize_group(const OcsFlowGroupSpec& group) {
         group_flows.push_back(flows_[static_cast<std::size_t>(flow_id)].get());
     }
     plane.enqueue_flows(std::move(group_flows));
+}
+
+void OcsTopology::materialize_group(const OcsFlowGroupSpec& group) {
+    OcsPlaneDataplane& plane = plane_by_id(group.plane_id);
+    const OcsConfiguration& configuration =
+        plan_->configuration_by_id(group.configuration_id);
+    const std::uint64_t generation = physical_generation_for_epoch(
+        group.plane_id, group.program_epoch_id);
+    plane.activate_static_path(group.program_epoch_id, group.configuration_id,
+                               generation, configuration.permutation);
+    release_group(group.flow_group_id);
 }
 
 void OcsTopology::release_static_groups(
@@ -127,6 +187,20 @@ void OcsTopology::note_flow_complete(const OcsFlowStats& stats) {
     }
     completed_flows_[static_cast<std::size_t>(stats.flow_id)] = true;
     checked_audit_add(completed_flow_count_, 1, "completed_flow_overflow");
+    if (flow_completion_callback_) {
+        flow_completion_callback_(stats);
+    }
+}
+
+void OcsTopology::note_flow_last_sent(const OcsFlowStats& stats) {
+    if (stats.flow_id >= selected_flows_.size() ||
+        !selected_flows_[static_cast<std::size_t>(stats.flow_id)]) {
+        throw OcsDataplaneError("flow_send_before_release",
+                                "last-sent callback refers to an unreleased flow");
+    }
+    if (flow_last_sent_callback_) {
+        flow_last_sent_callback_(stats);
+    }
 }
 
 void OcsTopology::run_until_idle() {
@@ -146,6 +220,21 @@ bool OcsTopology::data_plane_idle() const noexcept {
     });
 }
 
+bool OcsTopology::plane_data_plane_idle(std::uint64_t plane_id) const {
+    if (plane_id >= planes_.size()) {
+        throw OcsDataplaneError("unknown_plane", "plane ID is outside topology");
+    }
+    return planes_[static_cast<std::size_t>(plane_id)]->data_plane_idle();
+}
+
+void OcsTopology::abort_pending() {
+    for (auto& plane : planes_) {
+        plane->abort_pending();
+    }
+    packet_pool_.verify_all_returned();
+    batch_pool_.verify_all_returned();
+}
+
 OcsFlow& OcsTopology::flow_by_id(std::uint64_t flow_id) {
     if (flow_id >= flows_.size() ||
         flows_[static_cast<std::size_t>(flow_id)] == nullptr) {
@@ -159,6 +248,14 @@ OcsPlaneDataplane& OcsTopology::plane_by_id(std::uint64_t plane_id) {
     if (plane_id >= planes_.size()) {
         throw OcsDataplaneError("unknown_plane",
                                 "plane ID is outside topology");
+    }
+    return *planes_[static_cast<std::size_t>(plane_id)];
+}
+
+const OcsPlaneDataplane& OcsTopology::plane_by_id(
+    std::uint64_t plane_id) const {
+    if (plane_id >= planes_.size()) {
+        throw OcsDataplaneError("unknown_plane", "plane ID is outside topology");
     }
     return *planes_[static_cast<std::size_t>(plane_id)];
 }
@@ -192,7 +289,7 @@ OcsStaticDataplaneAudit OcsTopology::audit() const {
         static_cast<std::size_t>(plan_->topology.plane_count), 0);
 
     for (std::size_t flow_id = 0; flow_id < flows_.size(); ++flow_id) {
-        if (flows_[flow_id] == nullptr) {
+        if (flows_[flow_id] == nullptr || !selected_flows_[flow_id]) {
             continue;
         }
         OcsFlowStats flow = flows_[flow_id]->stats();
@@ -236,6 +333,19 @@ OcsStaticDataplaneAudit OcsTopology::audit() const {
         result.all_routes_exact =
             result.all_routes_exact && plane->routes_are_exact();
         result.planes.push_back(std::move(plane_stats));
+    }
+    return result;
+}
+
+std::vector<OcsFlowStats> OcsTopology::all_flow_stats() const {
+    std::vector<OcsFlowStats> result;
+    result.reserve(flows_.size());
+    for (const auto& flow : flows_) {
+        if (flow == nullptr) {
+            throw OcsDataplaneError("unknown_runtime_flow",
+                                    "runtime flow was not materialized");
+        }
+        result.push_back(flow->stats());
     }
     return result;
 }

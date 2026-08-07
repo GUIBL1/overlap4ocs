@@ -17,7 +17,7 @@
 
 namespace htsim_ocs::version {
 
-inline constexpr char kProgram[] = "0.3.0";
+inline constexpr char kProgram[] = "0.4.0";
 inline constexpr const char* kExecutionPlanSchema = contract::kPlanSchemaId;
 inline constexpr const char* kResultSchema = contract::kResultSchemaId;
 inline constexpr char kHtsimUpstreamCommit[] =

@@ -47,12 +47,20 @@ class OcsPlaneDataplane final {
                               std::uint64_t configuration_id,
                               std::uint64_t physical_config_generation,
                               const std::vector<std::uint64_t>& permutation);
+    void install_path(std::uint64_t program_epoch_id,
+                      std::uint64_t configuration_id,
+                      std::uint64_t physical_config_generation,
+                      const std::vector<std::uint64_t>& permutation);
     void enqueue_flows(std::vector<OcsFlow*> flows);
+    void abort_pending() noexcept;
 
     bool data_plane_idle() const noexcept;
+    bool path_installed() const noexcept;
     std::uint64_t in_flight_transit_unit_count() const noexcept {
         return in_flight_transit_unit_count_;
     }
+    std::uint64_t serializer_backlog_flow_count() const noexcept;
+    std::uint64_t serializer_backlog_bytes() const noexcept;
     OcsPlaneDataplaneStats stats() const;
     bool routes_are_exact() const noexcept;
 

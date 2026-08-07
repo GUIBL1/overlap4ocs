@@ -43,6 +43,7 @@ class OcsPortSerializer final : public EventSource {
 
     void enqueue_flows(std::vector<OcsFlow*> flows);
     void doNextEvent() override;
+    void abort_pending() noexcept;
 
     bool idle() const noexcept { return !event_pending_ && queue_.empty(); }
     std::uint64_t backlog_bytes() const noexcept { return backlog_bytes_; }

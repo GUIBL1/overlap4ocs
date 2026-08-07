@@ -35,11 +35,13 @@ struct OcsFlowStats {
 };
 
 using OcsFlowCompletionCallback = std::function<void(const OcsFlowStats&)>;
+using OcsFlowLastSentCallback = std::function<void(const OcsFlowStats&)>;
 
 class OcsFlow final {
   public:
     OcsFlow(const OcsFlowSpec& spec, OcsFlowRuntimeIdentity identity,
-            OcsFlowCompletionCallback completion_callback = {});
+            OcsFlowCompletionCallback completion_callback = {},
+            OcsFlowLastSentCallback last_sent_callback = {});
 
     const OcsFlowSpec& spec() const noexcept { return spec_; }
     const OcsFlowRuntimeIdentity& identity() const noexcept { return identity_; }
@@ -66,6 +68,7 @@ class OcsFlow final {
     OcsFlowRuntimeIdentity identity_;
     OcsPacketFlowBridge bridge_;
     OcsFlowCompletionCallback completion_callback_;
+    OcsFlowLastSentCallback last_sent_callback_;
     std::optional<std::uint64_t> release_ps_;
     std::optional<std::uint64_t> last_payload_sent_ps_;
     std::optional<std::uint64_t> last_payload_received_ps_;
