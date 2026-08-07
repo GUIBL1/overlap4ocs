@@ -42,12 +42,14 @@ ocs_plane_runtime.o
 ocs_guards.o
 ocs_watchdog.o
 ocs_coordinator.o
+ocs_result_writer.o
 main_ocs.o
 ```
 
-The Phase 4 objects implement the project-owned finite packet data plane and
-the Phase 5 objects implement the independent epoch/dependency/path-policy
-runtime. They add no vendored HTSim core translation unit. The link-closure
+The Phase 4 objects implement the project-owned finite packet data plane, the
+Phase 5 objects implement the independent epoch/dependency/path-policy
+runtime, and the Phase 6 writer serializes the formal result and operation
+trace. They add no vendored HTSim core translation unit. The link-closure
 probe replaces the parser/data-plane/runtime/CLI objects with
 `test_link_closure.o` and proves one Packet traverses `Route -> Pipe -> sink`
 and is freed exactly once.

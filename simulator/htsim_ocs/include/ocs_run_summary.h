@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "ocs_flow.h"
+#include "ocs_plane_dataplane.h"
 #include "ocs_trace_collector.h"
 
 namespace htsim_ocs {
@@ -119,6 +120,9 @@ struct OcsRunSummary {
     std::vector<OcsFlowGroupRuntimeStats> flow_groups;
     std::vector<OcsFlowStats> flows;
     std::vector<OcsPlaneRuntimeStats> planes;
+    std::vector<OcsPlaneDataplaneStats> dataplane_planes;
+    bool all_routes_exact;
+    bool all_pools_returned;
     std::vector<OcsTraceEvent> trace;
     std::optional<OcsBlockedState> blocked_state;
 };

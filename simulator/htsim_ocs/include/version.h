@@ -17,7 +17,7 @@
 
 namespace htsim_ocs::version {
 
-inline constexpr char kProgram[] = "0.4.0";
+inline constexpr char kProgram[] = "0.5.0";
 inline constexpr const char* kExecutionPlanSchema = contract::kPlanSchemaId;
 inline constexpr const char* kResultSchema = contract::kResultSchemaId;
 inline constexpr char kHtsimUpstreamCommit[] =
@@ -26,6 +26,8 @@ inline constexpr char kLocalPatchsetSha256[] =
     HTSIM_OCS_LOCAL_PATCHSET_SHA256;
 inline constexpr char kParentBuildCommit[] = HTSIM_OCS_PARENT_BUILD_COMMIT;
 inline constexpr char kParentBuildState[] = HTSIM_OCS_PARENT_BUILD_STATE;
+inline constexpr char kExactCoalescedEquivalenceVersion[] =
+    "phase04-exact-coalesced/v1";
 
 }  // namespace htsim_ocs::version
 

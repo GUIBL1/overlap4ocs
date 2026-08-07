@@ -19,6 +19,7 @@ class OcsRouteTable;
 struct OcsBusyInterval {
     std::uint64_t start_ps;
     std::uint64_t end_ps;
+    bool truncated_at_stop;
 };
 
 struct OcsSourcePortStats {
@@ -30,6 +31,7 @@ struct OcsSourcePortStats {
     std::uint64_t max_backlog_bytes;
     std::uint64_t busy_time_ps;
     std::vector<OcsBusyInterval> busy_intervals;
+    std::vector<std::uint64_t> max_backlog_bytes_by_program_epoch;
 };
 
 class OcsPortSerializer final : public EventSource {
@@ -86,6 +88,7 @@ class OcsPortSerializer final : public EventSource {
     std::uint64_t simulated_transit_unit_count_ = 0;
     std::uint64_t busy_time_ps_ = 0;
     std::vector<OcsBusyInterval> busy_intervals_;
+    std::vector<std::uint64_t> max_backlog_bytes_by_program_epoch_;
 };
 
 }  // namespace htsim_ocs

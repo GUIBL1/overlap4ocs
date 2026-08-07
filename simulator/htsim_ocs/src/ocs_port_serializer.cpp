@@ -51,6 +51,7 @@ void OcsPortSerializer::enqueue_flows(std::vector<OcsFlow*> flows) {
                                              const OcsFlow* right) {
         return left->spec().flow_id < right->spec().flow_id;
     });
+    std::optional<std::uint64_t> program_epoch_id;
     for (OcsFlow* flow : flows) {
         if (flow == nullptr || flow->identity().plane_id != plane_id_ ||
             flow->spec().src_rank != src_rank_) {
@@ -61,6 +62,13 @@ void OcsPortSerializer::enqueue_flows(std::vector<OcsFlow*> flows) {
             throw OcsDataplaneError("duplicate_flow_release",
                                     "flow was queued more than once");
         }
+        if (program_epoch_id.has_value() &&
+            *program_epoch_id != flow->identity().program_epoch_id) {
+            throw OcsDataplaneError(
+                "serializer_epoch_mismatch",
+                "one enqueue operation mixed program epochs");
+        }
+        program_epoch_id = flow->identity().program_epoch_id;
         flow->mark_released(EventList::now());
         queue_.push_back(flow);
         backlog_bytes_ = checked_counter_add(
@@ -69,6 +77,15 @@ void OcsPortSerializer::enqueue_flows(std::vector<OcsFlow*> flows) {
     }
     if (backlog_bytes_ > max_backlog_bytes_) {
         max_backlog_bytes_ = backlog_bytes_;
+    }
+    if (program_epoch_id.has_value()) {
+        const std::size_t epoch_index =
+            static_cast<std::size_t>(*program_epoch_id);
+        if (max_backlog_bytes_by_program_epoch_.size() <= epoch_index) {
+            max_backlog_bytes_by_program_epoch_.resize(epoch_index + 1, 0);
+        }
+        max_backlog_bytes_by_program_epoch_[epoch_index] = std::max(
+            max_backlog_bytes_by_program_epoch_[epoch_index], backlog_bytes_);
     }
     start_or_continue_busy_period();
 }
@@ -210,7 +227,8 @@ void OcsPortSerializer::close_busy_interval() {
         throw OcsDataplaneError("serializer_time_mismatch",
                                 "serializer time moved backwards");
     }
-    busy_intervals_.push_back(OcsBusyInterval{*busy_start_ps_, end_ps});
+    busy_intervals_.push_back(
+        OcsBusyInterval{*busy_start_ps_, end_ps, false});
     busy_time_ps_ = checked_counter_add(
         busy_time_ps_, end_ps - *busy_start_ps_,
         "serializer_busy_time_overflow");
@@ -233,14 +251,25 @@ void OcsPortSerializer::abort_pending() noexcept {
 }
 
 OcsSourcePortStats OcsPortSerializer::stats() const {
-    return OcsSourcePortStats{plane_id_,
-                              src_rank_,
-                              sent_payload_bytes_,
-                              logical_packet_count_,
-                              simulated_transit_unit_count_,
-                              max_backlog_bytes_,
-                              busy_time_ps_,
-                              busy_intervals_};
+    std::vector<OcsBusyInterval> intervals = busy_intervals_;
+    std::uint64_t busy_time_ps = busy_time_ps_;
+    if (busy_start_ps_.has_value()) {
+        const std::uint64_t end_ps = EventList::now();
+        intervals.push_back(OcsBusyInterval{*busy_start_ps_, end_ps, true});
+        busy_time_ps = checked_counter_add(
+            busy_time_ps, end_ps - *busy_start_ps_,
+            "serializer_busy_time_overflow");
+    }
+    return OcsSourcePortStats{
+        plane_id_,
+        src_rank_,
+        sent_payload_bytes_,
+        logical_packet_count_,
+        simulated_transit_unit_count_,
+        max_backlog_bytes_,
+        busy_time_ps,
+        std::move(intervals),
+        max_backlog_bytes_by_program_epoch_};
 }
 
 }  // namespace htsim_ocs

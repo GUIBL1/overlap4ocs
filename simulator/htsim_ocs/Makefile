@@ -54,6 +54,8 @@ RUNTIME_OBJECTS := \
 	$(BUILD_DIR)/ocs_guards.o \
 	$(BUILD_DIR)/ocs_watchdog.o \
 	$(BUILD_DIR)/ocs_coordinator.o
+RESULT_OBJECTS := \
+	$(BUILD_DIR)/ocs_result_writer.o
 CLI_OBJECT := $(BUILD_DIR)/main_ocs.o
 
 TARGET := $(BUILD_DIR)/htsim_ocs
@@ -65,17 +67,19 @@ PACKET_ADAPTER_TEST := $(BUILD_DIR)/test_packet_adapter
 ROUTE_HANDOFF_TEST := $(BUILD_DIR)/test_route_handoff
 STATIC_DATAPLANE_TEST := $(BUILD_DIR)/test_static_dataplane
 RUNTIME_DRIVER_TEST := $(BUILD_DIR)/test_runtime_driver
+RESULT_WRITER_TEST := $(BUILD_DIR)/test_result_writer
 TEST_RUNNER_ARGS ?=
 
 .PHONY: all clean test test-link-closure test-eventlist test-parser \
 	test-packet-adapter test-dataplane test-coalesced-equivalence \
 	test-epoch test-dependencies test-path-policies test-watchdog \
+	test-phase06 phase06-performance-evidence \
 	check-link-closure check-vendor core-link-probe
 
 all: $(TARGET)
 
 $(TARGET): $(SHIM_OBJECT) $(CORE_OBJECTS) $(PARSER_OBJECTS) \
-	$(DATAPLANE_OBJECTS) $(RUNTIME_OBJECTS) $(CLI_OBJECT)
+	$(DATAPLANE_OBJECTS) $(RUNTIME_OBJECTS) $(RESULT_OBJECTS) $(CLI_OBJECT)
 	$(CXX) $(LDFLAGS) -Wl,-Map,$(BUILD_DIR)/htsim_ocs.map -o $@ $^ $(LDLIBS)
 
 $(LINK_CLOSURE_TEST): $(SHIM_OBJECT) $(CORE_OBJECTS) $(BUILD_DIR)/test_link_closure.o
@@ -110,6 +114,11 @@ $(RUNTIME_DRIVER_TEST): $(SHIM_OBJECT) $(CORE_OBJECTS) $(PARSER_OBJECTS) \
 	$(BUILD_DIR)/test_runtime_driver.o
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
+$(RESULT_WRITER_TEST): $(SHIM_OBJECT) $(CORE_OBJECTS) $(PARSER_OBJECTS) \
+	$(DATAPLANE_OBJECTS) $(RUNTIME_OBJECTS) $(RESULT_OBJECTS) \
+	$(BUILD_DIR)/test_result_writer.o
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+
 $(GENERATED_CONTRACT): tools/generate_contract_header.py \
 	$(SCHEMA_DIR)/swot-execution-plan-v2.schema.json \
 	$(SCHEMA_DIR)/swot-simulation-result-v2.schema.json \
@@ -125,6 +134,11 @@ $(GENERATED_CONTRACT): tools/generate_contract_header.py \
 
 $(BUILD_DIR)/main_ocs.o: src/main_ocs.cpp include/version.h \
 	include/ocs_plan_parser.h $(GENERATED_CONTRACT) $(PATCHSET_MANIFEST) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(VERSION_CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
+
+$(BUILD_DIR)/ocs_result_writer.o: src/ocs_result_writer.cpp \
+	include/ocs_result_writer.h include/version.h $(GENERATED_CONTRACT) \
+	$(PATCHSET_MANIFEST) | $(BUILD_DIR)
 	$(CXX) $(CPPFLAGS) $(VERSION_CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
 $(BUILD_DIR)/htsim_logged_shim.o: src/htsim_logged_shim.cpp | $(BUILD_DIR)
@@ -156,6 +170,10 @@ $(BUILD_DIR)/test_static_dataplane.o: tests/test_static_dataplane.cpp \
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
 $(BUILD_DIR)/test_runtime_driver.o: tests/test_runtime_driver.cpp \
+	$(GENERATED_CONTRACT) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
+
+$(BUILD_DIR)/test_result_writer.o: tests/test_result_writer.cpp \
 	$(GENERATED_CONTRACT) | $(BUILD_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
@@ -218,6 +236,21 @@ test-watchdog: $(RUNTIME_DRIVER_TEST)
 	$(PYTHON) tests/run_runtime_tests.py \
 		--binary $(RUNTIME_DRIVER_TEST) --suite watchdog
 
+test-phase06: all $(RESULT_WRITER_TEST)
+	PYTHONPATH=$(ROOT_DIR) $(PYTHON) tests/test_standalone_cases.py \
+		--binary $(TARGET)
+	PYTHONPATH=$(ROOT_DIR) $(PYTHON) tests/test_failure_contract.py \
+		--binary $(TARGET) --result-writer-driver $(RESULT_WRITER_TEST)
+	PYTHONPATH=$(ROOT_DIR) $(PYTHON) tests/test_determinism.py \
+		--binary $(TARGET)
+	PYTHONPATH=$(ROOT_DIR) $(PYTHON) tests/test_performance_gate.py \
+		--binary $(TARGET)
+
+phase06-performance-evidence: all
+	PYTHONPATH=$(ROOT_DIR) $(PYTHON) tests/test_performance_gate.py \
+		--binary $(TARGET) \
+		--write-evidence tests/artifacts/phase06/performance-evidence.json
+
 check-link-closure: all $(LINK_CLOSURE_TEST)
 	$(PYTHON) tests/run_tests.py \
 		--binary $(TARGET) \
@@ -228,7 +261,7 @@ check-link-closure: all $(LINK_CLOSURE_TEST)
 
 test: all test-link-closure test-eventlist test-parser test-packet-adapter \
 	test-dataplane test-coalesced-equivalence test-epoch test-dependencies \
-	test-path-policies test-watchdog check-link-closure
+	test-path-policies test-watchdog test-phase06 check-link-closure
 
 check-vendor: all
 	$(PYTHON) tests/run_tests.py --check-vendor --binary $(TARGET)
@@ -239,7 +272,9 @@ clean:
 -include $(CLI_OBJECT:.o=.d) $(SHIM_OBJECT:.o=.d) \
 	$(CORE_OBJECTS:.o=.d) $(PARSER_OBJECTS:.o=.d) \
 	$(DATAPLANE_OBJECTS:.o=.d) $(RUNTIME_OBJECTS:.o=.d) \
+	$(RESULT_OBJECTS:.o=.d) \
 	$(BUILD_DIR)/test_link_closure.d $(BUILD_DIR)/test_eventlist_order.d \
 	$(BUILD_DIR)/test_plan_parser.d $(BUILD_DIR)/test_sha256.d \
 	$(BUILD_DIR)/test_packet_adapter.d $(BUILD_DIR)/test_route_handoff.d \
-	$(BUILD_DIR)/test_static_dataplane.d $(BUILD_DIR)/test_runtime_driver.d
+	$(BUILD_DIR)/test_static_dataplane.d $(BUILD_DIR)/test_runtime_driver.d \
+	$(BUILD_DIR)/test_result_writer.d

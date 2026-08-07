@@ -489,7 +489,7 @@ OcsRunSummary OcsCoordinator::make_summary(
     std::string status, std::string stop_reason,
     std::optional<std::string> error_code,
     std::optional<std::uint64_t> next_event_time_ps) {
-    const OcsStaticDataplaneAudit audit = topology_.audit();
+    OcsStaticDataplaneAudit audit = topology_.audit();
     std::uint64_t completed_flows = 0;
     std::vector<OcsFlowStats> flows = topology_.all_flow_stats();
     for (const OcsFlowStats& flow : flows) {
@@ -545,6 +545,9 @@ OcsRunSummary OcsCoordinator::make_summary(
         std::move(group_stats),
         std::move(flows),
         std::move(planes),
+        std::move(audit.planes),
+        audit.all_routes_exact,
+        audit.all_pools_returned,
         trace_.events(),
         std::move(blocked)};
 }

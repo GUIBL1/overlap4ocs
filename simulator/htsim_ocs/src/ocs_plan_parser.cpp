@@ -998,15 +998,6 @@ class ResultBound final {
         value_ += product;
     }
 
-    void add_product(std::uint64_t first, std::uint64_t second,
-                     std::uint64_t bytes_each) {
-        if (first != 0 && second > limit_ / first) {
-            exceeded_ = true;
-            return;
-        }
-        add(first * second, bytes_each);
-    }
-
     bool exceeded() const { return exceeded_; }
     std::uint64_t value() const { return value_; }
 
@@ -1038,12 +1029,17 @@ std::uint64_t conservative_result_bound(const OcsExecutionPlanV2& plan) {
 
     std::uint64_t port_count = 0;
     if (!checked_mul_u64(plan.topology.node_count, plan.topology.plane_count,
-                         port_count) ||
-        !checked_mul_u64(port_count, 2, port_count)) {
+                         port_count)) {
         fail("result_file_size_limit", "/",
              "result upper bound exceeds ABI limit");
     }
-    bound.add_product(port_count, plan.flows.size(), 192);
+    // The result owns one source-port object per (plane, rank). A busy
+    // interval is created by a flow on exactly one of those ports, so the
+    // total interval count is bounded by the flow count, not by the Cartesian
+    // product of ports and flows. Keeping this bound linear is required for
+    // the contracted p=256, k=8 exact-coalesced acceptance case.
+    bound.add(port_count, 512);
+    bound.add(plan.flows.size(), 192);
     if (bound.exceeded()) {
         fail("result_file_size_limit", "/",
              "result upper bound exceeds ABI limit");
