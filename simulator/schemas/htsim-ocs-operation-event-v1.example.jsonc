@@ -1,0 +1,47 @@
+{
+  // 本文件是 htsim-ocs-operation-event-v1.schema.json 的带注释示例。
+  // 正式轨迹是 JSONL：每一行都是一个不带注释的完整事件对象，而不是 JSON 数组。
+
+  // 固定事件模式版本。
+  "schema_version": "htsim-ocs-operation-event/v1",
+
+  // 从 0 开始连续递增的事件序号。
+  "event_index": 6,
+
+  // 事件发生时间，单位为整数皮秒；轨迹中必须非递减。
+  "time_ps": 20020,
+
+  // 事件类型。允许值：blocked_guard_snapshot、epoch_close、epoch_open、
+  // flow_complete、flow_last_sent、group_complete、group_release、
+  // lockstep_all_paths_ready、path_prep_start、path_ready、
+  // reconfiguration_end、reconfiguration_start、simulation_complete、
+  // step_complete、token_ready。
+  "event_type": "flow_complete",
+
+  // 相关光平面编号；事件不属于单一平面时为 null。
+  "plane_id": 0,
+
+  // 相关平面程序时期编号；不适用时为 null。
+  "program_epoch_id": 0,
+
+  // 事件发生时的物理配置代次；不适用或尚未安装时为 null。
+  "physical_config_generation": 0,
+
+  // 相关完整光路配置编号；不适用时为 null。
+  "configuration_id": 0,
+
+  // 相关逻辑步骤编号；不适用时为 null。
+  "step_id": 0,
+
+  // 相关流组编号；不适用时为 null。
+  "flow_group_id": 0,
+
+  // 相关数据流编号；不适用时为 null。
+  "flow_id": 0,
+
+  // 相关就绪令牌编号；只有令牌事件等需要填写，其他事件为 null。
+  "token_id": null,
+
+  // 机器可读原因码；阻塞快照等诊断事件填写，普通生命周期事件为 null。
+  "reason_code": null
+}

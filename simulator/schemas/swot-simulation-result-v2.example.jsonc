@@ -1,0 +1,409 @@
+{
+  // 本文件是 swot-simulation-result-v2.schema.json 的带注释结构示例。
+  // 结果文件由 htsim_ocs 生成，调用方应读取和校验，不应手工拼装。
+  // 此处使用运行时失败结果，以便同时展示 blocked_state 和 error 的全部字段。
+
+  // 固定结果模式版本。
+  "schema_version": "swot-simulation-result/v2",
+
+  // 来自执行计划的案例标识；若输入尚未解析出该字段则为 null。
+  "case_id": "case-103dc7bd29e9a4888802132f68cd02297006eeeae3d12730947799cc057d812c",
+
+  // 来自执行计划的策略；可为 baseline、one_shot、swot，解析前失败时为 null。
+  "strategy": "one_shot",
+
+  // success 表示成功完成；failure 表示输入、运行时、预算、输入输出或内部失败。
+  "status": "failure",
+
+  // 正式停止原因。成功只能是 collective_complete。
+  // 失败值还包括 invalid_input、unsupported_semantics、deadlock、
+  // invariant_violation、max_simulation_time、max_event_count、io_error、internal_error。
+  "stop_reason": "deadlock",
+
+  // 输入计划原始字节的 SHA-256；无法读取计划时可以为 null。
+  "plan_file_sha256": "1bb561f001bfc4e2b13bd288cac765ec67703ed9421f24320a7d952e062c20f4",
+
+  // 与执行计划相同的固定单位；解析前失败时整个对象为 null。
+  "units": {
+    // 所有数据量都使用字节。
+    "data": "byte",
+    // 速率都使用比特每秒。
+    "rate": "bit_per_second",
+    // 时间都使用整数皮秒。
+    "time": "picosecond"
+  },
+
+  // 当前成功解析的传输模式只能是 paper_exact；解析前失败时为 null。
+  "transport_mode": "paper_exact",
+
+  // 当前成功解析的链路模型只能是 payload_only；解析前失败时为 null。
+  "wire_model": "payload_only",
+
+  // 当前完成语义只能是 receiver_last_payload_byte；解析前失败时为 null。
+  "completion_semantics": "receiver_last_payload_byte",
+
+  // 实际执行模式：full_packet 或 exact_coalesced；解析前失败时为 null。
+  "execution_mode": "exact_coalesced",
+
+  // 计划指定的停止预算；解析前失败时整个对象为 null。
+  "run_limits": {
+    // 计划的唯一随机种子。
+    "seed": 0,
+    // 最大仿真时间，单位为皮秒且大于 0。
+    "max_sim_time_ps": 1000000000000000,
+    // 最大事件数且大于 0。
+    "max_events": 10000000
+  },
+
+  // 实际依赖模式；解析前失败时为 null。
+  "dependency_mode": "global_step_barrier",
+
+  // 实际路径准备策略；解析前失败时为 null。
+  "path_preparation_policy": "static_preinstalled",
+
+  // 所有时间均为整数皮秒；尚未发生或失败时使用 null。
+  "timing": {
+    // 集合通信开始令牌就绪时间，正常为 0。
+    "collective_start_ps": 0,
+    // 最后一条必需流到达接收端的时间；失败时必须为 null。
+    "collective_complete_ps": null,
+    // collective_complete_ps 减 collective_start_ps；失败时必须为 null。
+    "simulated_cct_ps": null,
+    // 仿真实际停止的时间；若事件列表尚未启动可以为 null。
+    "simulation_stop_ps": 20020
+  },
+
+  // 全局流量统计；解析前失败时整个对象为 null。
+  "traffic": {
+    // 计划中的数据流总数与已经接收完成的数据流数。
+    "expected_flow_count": 1,
+    "completed_flow_count": 0,
+    // 计划中的流组总数与已经完成的流组数。
+    "expected_flow_group_count": 1,
+    "completed_flow_group_count": 0,
+    // 计划有效载荷、已经发送和已经接收的精确字节数。
+    "expected_payload_bytes": 1000,
+    "sent_payload_bytes": 1000,
+    "received_payload_bytes": 0,
+    // 当前 payload_only 模型在线路上发送的字节数。
+    "wire_bytes": 1000,
+    // 按最大传输单元拆分后的逻辑数据包数量。
+    "logical_packet_count": 1,
+    // 实际创建的在途仿真单元数；合并模式下可少于逻辑包数。
+    "simulated_transit_unit_count": 1,
+    // HTSim 事件列表实际处理的事件数。
+    "processed_event_count": 2,
+    // 丢弃、重复和缺失的有效载荷字节审计。
+    "drops": 0,
+    "duplicate_payload_bytes": 0,
+    "missing_payload_bytes": 1000,
+    // 停止时仍在传输途中的仿真单元数。
+    "in_flight_transit_unit_count": 1,
+    // 停止时未完成的数据流编号，唯一并按升序排列。
+    "unfinished_flow_ids": [0],
+    // 每个进程发送的有效载荷，数组长度等于 rank_count。
+    "per_rank_sent_payload_bytes": [1000, 0, 0, 0],
+    // 每个进程接收的有效载荷，数组长度等于 rank_count。
+    "per_rank_received_payload_bytes": [0, 0, 0, 0],
+    // 每个光平面承载的有效载荷，数组长度等于 plane_count。
+    "per_plane_payload_bytes": [1000]
+  },
+
+  // 每个就绪令牌的最终状态，数组按 token_id 升序排列。
+  "tokens": [
+    {
+      // 令牌编号和类型来自执行计划。
+      "token_id": 0,
+      "token_type": "collective_start",
+      // 集合开始令牌没有产生者；其他令牌填流组或步骤编号。
+      "producer_id": null,
+      // ready 表示已发布，pending 表示停止时仍未发布。
+      "status": "ready",
+      // 令牌发布时间；pending 时为 null。
+      "ready_ps": 0
+    },
+    {
+      "token_id": 1,
+      "token_type": "flow_group_complete",
+      "producer_id": 0,
+      "status": "pending",
+      "ready_ps": null
+    },
+    {
+      "token_id": 2,
+      "token_type": "step_complete",
+      "producer_id": 0,
+      "status": "pending",
+      "ready_ps": null
+    }
+  ],
+
+  // 每个逻辑步骤的聚合结果，数组按 step_id 升序排列。
+  "steps": [
+    {
+      // 步骤编号和成员流组编号。
+      "step_id": 0,
+      "flow_group_ids": [0],
+      // 步骤完成时应发布的令牌编号。
+      "completion_token_id": 2,
+      // 预期和已经完成的流组数量。
+      "expected_flow_group_count": 1,
+      "completed_flow_group_count": 0,
+      // 第一个成员流组的释放时间；从未释放时为 null。
+      "first_flow_group_release_ps": 0,
+      // 全部成员流组接收完成的时间；未完成时为 null。
+      "completion_ps": null,
+      // pending、active、complete 或 failed。
+      "status": "active"
+    }
+  ],
+
+  // 每个流组的依赖、放置和字节统计，数组按 flow_group_id 升序排列。
+  "flow_groups": [
+    {
+      // 流组、步骤、光平面、程序时期和配置编号。
+      "flow_group_id": 0,
+      "step_id": 0,
+      "plane_id": 0,
+      "program_epoch_id": 0,
+      "configuration_id": 0,
+      // 实际使用的物理配置代次；尚未安装路径时为 null。
+      "physical_config_generation": 0,
+      // 父令牌和成员流编号，唯一并按升序排列。
+      "depends_on_token_ids": [0],
+      "flow_ids": [0],
+      // 全部父令牌就绪、流组释放和接收完成的时间；未发生时为 null。
+      "dependency_ready_ps": 0,
+      "release_ps": 0,
+      "completion_ps": null,
+      // 预期和已经接收完成的数据流数量。
+      "expected_flow_count": 1,
+      "completed_flow_count": 0,
+      // 预期、已发送和已接收的有效载荷字节数。
+      "expected_payload_bytes": 1000,
+      "sent_payload_bytes": 1000,
+      "received_payload_bytes": 0,
+      // pending、released、complete 或 failed。
+      "status": "released"
+    }
+  ],
+
+  // 每条数据流的精确发送与接收结果，数组按 flow_id 升序排列。
+  "flows": [
+    {
+      // 数据流编号、所属流组、源进程和目的进程。
+      "flow_id": 0,
+      "flow_group_id": 0,
+      "src_rank": 0,
+      "dst_rank": 1,
+      // 计划要求发送的有效载荷字节数。
+      "payload_bytes": 1000,
+      // 释放、最后一个字节发出、最后一个字节到达的时间；未发生时为 null。
+      "release_ps": 0,
+      "last_payload_sent_ps": 20000,
+      "last_payload_received_ps": null,
+      // 精确发送和接收的有效载荷字节数。
+      "sent_payload_bytes": 1000,
+      "received_payload_bytes": 0,
+      // 按最大传输单元计算的逻辑数据包数量。
+      "logical_packet_count": 1,
+      // pending、queued、in_flight、complete 或 failed。
+      "status": "in_flight"
+    }
+  ],
+
+  // 每个光平面的运行结果，数组按 plane_id 升序排列。
+  "planes": [
+    {
+      // 光平面编号。
+      "plane_id": 0,
+      // 本平面预期、发送和接收的有效载荷字节数。
+      "expected_payload_bytes": 1000,
+      "sent_payload_bytes": 1000,
+      "received_payload_bytes": 0,
+      // 本平面所有源串行化器的忙碌时间总和。
+      "busy_time_ps": 20000,
+      // 任一源串行化器观察到的最大排队字节数。
+      "max_serializer_backlog_bytes": 1000,
+      // 每个源端口的统计，通常按 src_rank 升序排列。
+      "source_ports": [
+        {
+          // 源进程编号。
+          "src_rank": 0,
+          // 本端口发送的有效载荷和逻辑包数量。
+          "sent_payload_bytes": 1000,
+          "logical_packet_count": 1,
+          // 本端口观察到的最大排队字节数。
+          "max_backlog_bytes": 1000,
+          // 所有忙碌区间长度之和，单位为皮秒。
+          "busy_time_ps": 20000,
+          // 串行化器连续忙碌区间。
+          "busy_intervals": [
+            {
+              // 区间起止时间，end_ps 不早于 start_ps。
+              "start_ps": 0,
+              "end_ps": 20000,
+              // 仿真停止时仍忙碌则为 true。
+              "truncated_at_stop": false
+            }
+          ]
+        },
+        {
+          "src_rank": 1,
+          "sent_payload_bytes": 0,
+          "logical_packet_count": 0,
+          "max_backlog_bytes": 0,
+          "busy_time_ps": 0,
+          "busy_intervals": []
+        },
+        {
+          "src_rank": 2,
+          "sent_payload_bytes": 0,
+          "logical_packet_count": 0,
+          "max_backlog_bytes": 0,
+          "busy_time_ps": 0,
+          "busy_intervals": []
+        },
+        {
+          "src_rank": 3,
+          "sent_payload_bytes": 0,
+          "logical_packet_count": 0,
+          "max_backlog_bytes": 0,
+          "busy_time_ps": 0,
+          "busy_intervals": []
+        }
+      ],
+      // 本平面每个程序时期的生命周期，按 program_epoch_id 升序排列。
+      "epochs": [
+        {
+          // 程序时期编号、转换类型和配置编号。
+          "program_epoch_id": 0,
+          "transition": "initial",
+          "configuration_id": 0,
+          // 实际物理配置代次；路径尚未安装时为 null。
+          "physical_config_generation": 0,
+          // 路径准备父令牌和成员流组编号。
+          "path_prep_not_before_token_ids": [],
+          "flow_group_ids": [0],
+          // 路径准备开始和路径可用时间；未发生时为 null。
+          "path_prep_start_ps": 0,
+          "path_ready_ps": 0,
+          // 真实重构的起止时间；initial 和 retain 通常为 null。
+          "reconfiguration_start_ps": null,
+          "reconfiguration_end_ps": null,
+          // 首次传输、全部传输完成、排空和关闭时间；未发生时为 null。
+          "transfer_start_ps": 0,
+          "transfer_complete_ps": null,
+          "drain_complete_ps": null,
+          "close_ps": null,
+          // 本时期串行化忙碌时间与最大排队字节数。
+          "busy_time_ps": 20000,
+          "max_serializer_backlog_bytes": 1000,
+          // pending、path_preparing、path_ready、active、draining、closed 或 failed。
+          "status": "active"
+        }
+      ]
+    }
+  ],
+
+  // 强制运行时不变量。成功结果必须全部为 true；尚未检查的项目为 null。
+  "invariants": {
+    // 所有步骤是否完成。
+    "all_steps_complete": false,
+    // 所有流组是否完成。
+    "all_flow_groups_complete": false,
+    // 每条流是否精确发送并接收计划字节数。
+    "all_flows_exact_bytes": false,
+    // 所有路径是否与计划配置一致。
+    "all_routes_match_configuration": true,
+    // 所有父令牌依赖是否得到遵守。
+    "all_dependency_tokens_respected": true,
+    // 所有数据流是否在指定程序时期执行。
+    "all_program_epochs_respected": true,
+    // 数据包携带的物理代次是否与安装配置一致。
+    "all_physical_generations_respected": true,
+    // 同一平面是否没有同时传输和重构。
+    "no_same_plane_transfer_reconfiguration_overlap": true,
+    // 路径准备是否遵守所选策略。
+    "path_preparation_policy_respected": true,
+    // 一个平面的重构是否没有错误阻塞其他平面。
+    "no_cross_plane_reconfiguration_blocking": true,
+    // 是否没有意外丢弃。
+    "no_unexpected_drop": true,
+    // 汇总计数是否与各明细一致。
+    "result_aggregates_match_details": true
+  },
+
+  // 运行时失败的完整阻塞快照；成功或解析前失败时为 null。
+  "blocked_state": {
+    // 停止时未就绪令牌、未完成步骤、流组和数据流编号。
+    "unfinished_token_ids": [1, 2],
+    "unfinished_step_ids": [0],
+    "unfinished_flow_group_ids": [0],
+    "unfinished_flow_ids": [0],
+    // 事件列表中的下一事件时间；没有下一事件时为 null。
+    "next_event_time_ps": null,
+    // 每个平面的阻塞状态。
+    "planes": [
+      {
+        // 光平面编号。
+        "plane_id": 0,
+        // initializing、ready_reserved、reconfiguring、active_epoch、
+        // draining_epoch、program_complete 或 failed。
+        "state": "active_epoch",
+        // 当前平面程序游标。
+        "program_cursor": 0,
+        // 活动时期、配置和物理代次；没有活动值时为 null。
+        "active_program_epoch_id": 0,
+        "active_configuration_id": 0,
+        "physical_config_generation": 0,
+        // 停止时串行化器中仍排队的数据流数量。
+        "serializer_backlog_flow_count": 0,
+        // 停止时本平面仍在途的仿真单元数量。
+        "in_flight_transit_unit_count": 1,
+        // 当前路径准备仍等待的令牌编号。
+        "pending_path_prep_token_ids": []
+      }
+    ]
+  },
+
+  // 结构化失败信息；成功结果为 null。
+  "error": {
+    // 稳定机器错误码，不能为空；不要依赖 message 做程序分支。
+    "error_code": "no_progress",
+    // 指向无效输入字段的 JSON Pointer；运行时错误可为 null。
+    "json_pointer": null,
+    // 面向人的诊断文本，不能为空但不保证作为稳定接口。
+    "message": "simulation cannot make progress",
+    // 关联实体类型：none、flow、flow_group、step 或 plane_epoch。
+    "entity_type": "flow_group",
+    // 关联实体编号；没有明确实体时为 null。
+    "entity_id": 0,
+    // 关联光平面编号；只有 plane_epoch 错误填写，其他类型必须为 null。
+    "plane_id": null
+  },
+
+  // 后端构建、模式和等价证明身份；输入解析前失败时整个对象为 null。
+  "provenance": {
+    // htsim_ocs 后端版本。
+    "htsim_ocs_version": "0.5.0",
+    // 上游 HTSim 的 40 位 Git 提交号。
+    "htsim_upstream_git_sha": "841d9e7be46bb968eece766aa4b6c044c7799f67",
+    // 本地 HTSim 补丁集 SHA-256。
+    "htsim_local_patchset_sha256": "51bece963136736a2528ddad36924d022147ebe80933d58b3307e04ef5d15d37",
+    // 构建该程序的父仓库 40 位 Git 提交号。
+    "parent_build_commit": "22011bf00d3863fda16baf93a3d05b8e76af9c60",
+    // 编译器身份字符串。
+    "compiler_id": "11.4.0",
+    // 正式构建参数 SHA-256。
+    "build_flags_sha256": "0e3469e20cdca5e487fad86c1c237f22c8bcc7334e26a21f4457e95e4181bbda",
+    // 输入模式身份和原始文件 SHA-256。
+    "plan_schema_id": "swot-execution-plan/v2",
+    "plan_schema_sha256": "b37ce8b5a87127b84967d990bd0055ef0c6cd5b5be20139e0fef05aac3f17d78",
+    // 结果模式身份和原始文件 SHA-256。
+    "result_schema_id": "swot-simulation-result/v2",
+    "result_schema_sha256": "857e2d8d9f91bd17fd140326b832a542e95f323cd243a6bb986ef84ef1390a86",
+    // exact_coalesced 的等价证明版本；full_packet 结果可以为 null。
+    "exact_coalesced_equivalence_version": "phase04-exact-coalesced/v1"
+  }
+}

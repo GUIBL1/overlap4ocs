@@ -1,0 +1,341 @@
+{
+  // 本文件是 swot-execution-plan-v2.schema.json 的带注释示例。
+  // JSONC 仅用于阅读；实际传给 htsim_ocs 的文件必须删除注释并使用严格 JSON。
+
+  // 固定模式版本，只能填写 swot-execution-plan/v2。
+  "schema_version": "swot-execution-plan/v2",
+
+  // 案例标识：固定前缀 case-，后接 64 位小写十六进制摘要。
+  "case_id": "case-103dc7bd29e9a4888802132f68cd02297006eeeae3d12730947799cc057d812c",
+
+  // 调度方案：baseline、one_shot 或 swot。
+  // 它必须与后面的 path_preparation_policy 匹配。
+  "strategy": "one_shot",
+
+  // 单位是固定契约，不能改成其他写法。
+  "units": {
+    // 所有数据量都使用字节。
+    "data": "byte",
+    // 每个光平面的端点速率使用比特每秒。
+    "rate": "bit_per_second",
+    // 所有仿真时间都使用整数皮秒。
+    "time": "picosecond"
+  },
+
+  // 集合通信工作负载的身份和规模。
+  "workload": {
+    // 集合通信名称，不能为空，例如 allreduce。
+    "collective_id": "allreduce",
+    // 上游生成流量时采用的算法名称，不能为空。
+    "algorithm_id": "one_shot_static_preinstalled",
+    // 算法流量生成规则的版本，不能为空。
+    "algorithm_semantics_version": "fixture/v1",
+    // 集合通信数据语义的版本，不能为空。
+    "collective_semantics_version": "allreduce/v1",
+    // 进程数量，必须大于 0；合法进程编号为 0 到 rank_count-1。
+    "rank_count": 4,
+    // 每个进程的原始消息字节数，可以为 0。
+    "message_bytes_per_rank": 1000
+  },
+
+  // OCS 拓扑与时间参数。
+  "topology": {
+    // 节点数，必须大于 0，当前应与 rank_count 一致。
+    "node_count": 4,
+    // 相互独立的光平面数量，必须大于 0。
+    "plane_count": 1,
+    // 每个光平面、每个源端口的发送速率，单位为比特每秒。
+    "per_plane_bps": 400000000000,
+    // 数据从交换器前向传播到接收端的单程时延，单位为皮秒。
+    "data_latency_ps": 20,
+    // 一次真实光路重构的持续时间，单位为皮秒。
+    "reconfiguration_delay_ps": 200,
+    // 当前只支持全双工。
+    "duplex": "full",
+    // 每个平面第一次使用的配置在 0 ps 预安装，不收取重构时间。
+    "initial_configuration_policy": "first_use_preinstalled"
+  },
+
+  // 论文精确传输模型；这些枚举值目前都是固定的。
+  "transport": {
+    // 当前只支持 paper_exact。
+    "mode": "paper_exact",
+    // 链路只统计有效载荷，不加入协议头。
+    "wire_model": "payload_only",
+    // 最后一个数据包按剩余字节精确截尾。
+    "packetization": "exact_tail",
+    // 最大传输单元字节数，范围为 1 到 65535。
+    "mtu_bytes": 1500,
+    // 当前模型无丢包。
+    "loss_mode": "lossless",
+    // 当前模型不生成确认报文。
+    "ack_mode": "none",
+    // 数据流在最后一个有效载荷字节到达接收端时完成。
+    "completion_semantics": "receiver_last_payload_byte"
+  },
+
+  // full_packet 逐包执行；exact_coalesced 精确合并连续数据包，适合大规模仿真。
+  "execution_mode": "exact_coalesced",
+
+  // 由计划拥有的确定性与停止预算。
+  "run_limits": {
+    // 唯一随机种子；当前执行是确定性的，但字段仍必须提供。
+    "seed": 0,
+    // 最大仿真时间，单位为皮秒，必须大于 0。
+    "max_sim_time_ps": 1000000000000000,
+    // 最多处理的事件数量，必须大于 0。
+    "max_events": 10000000
+  },
+
+  // global_step_barrier 表示全步骤同步；explicit_group_dag 表示显式流组依赖图。
+  "dependency_mode": "global_step_barrier",
+
+  // baseline 必须用 step_lockstep；one_shot 必须用 static_preinstalled；
+  // swot 必须用 overlap_earliest。
+  "path_preparation_policy": "static_preinstalled",
+
+  // 完整光路配置表。数组按 configuration_id 升序排列，编号从 0 连续开始。
+  "configurations": [
+    {
+      // 配置编号，在流组和光平面程序中引用。
+      "configuration_id": 0,
+      // 完整置换：下标是源进程，值是该源在此配置下连接的目的进程。
+      // 长度必须等于 rank_count，每个目的进程必须恰好出现一次。
+      "permutation": [1, 0, 3, 2]
+    }
+  ],
+
+  // 逻辑数据段描述原始缓冲区中的数据所有权。
+  // 数组按 segment_id 升序排列，标识符唯一。
+  "logical_segments": [
+    {
+      // 数据段编号，供 flow.segment_slices 引用。
+      "segment_id": 0,
+      // 数据段在逻辑缓冲区中的起始字节偏移，可以为 0。
+      "buffer_offset_bytes": 0,
+      // 数据段长度，必须大于 0。
+      "length_bytes": 1000,
+      // 初始拥有该数据的进程编号；非空、唯一并按升序排列。
+      "origin_rank_ids": [0],
+      // 集合通信结束时应拥有该数据的进程编号；非空、唯一并按升序排列。
+      "final_destination_rank_ids": [1]
+    },
+    {
+      "segment_id": 1,
+      "buffer_offset_bytes": 0,
+      "length_bytes": 1000,
+      "origin_rank_ids": [2],
+      "final_destination_rank_ids": [3]
+    }
+  ],
+
+  // 就绪令牌是依赖关系的唯一触发源，数组按 token_id 升序排列。
+  "readiness_tokens": [
+    {
+      // 令牌编号，必须唯一。
+      "token_id": 0,
+      // collective_start 在 0 ps 就绪，且 producer_id 必须为 null。
+      "token_type": "collective_start",
+      // 产生者编号；集合开始令牌没有产生者。
+      "producer_id": null
+    },
+    {
+      "token_id": 1,
+      // flow_group_complete 由对应 flow_group_id 的流组完成时产生。
+      "token_type": "flow_group_complete",
+      "producer_id": 0
+    },
+    {
+      "token_id": 2,
+      // step_complete 由对应 step_id 的步骤完成时产生。
+      "token_type": "step_complete",
+      "producer_id": 0
+    },
+    {
+      "token_id": 3,
+      "token_type": "flow_group_complete",
+      "producer_id": 1
+    },
+    {
+      "token_id": 4,
+      "token_type": "step_complete",
+      "producer_id": 1
+    }
+  ],
+
+  // 逻辑步骤按 step_id 升序排列，编号从 0 连续开始。
+  "steps": [
+    {
+      // 步骤编号。
+      "step_id": 0,
+      // 人类可读的阶段名称，不能为空；后端不根据名称推断语义。
+      "phase": "fixture_phase_0",
+      // 属于本步骤的流组编号；非空、唯一并按升序排列。
+      "flow_group_ids": [0],
+      // 本步骤完成后发布的 step_complete 令牌编号。
+      "completion_token_id": 2
+    },
+    {
+      "step_id": 1,
+      "phase": "fixture_phase_1",
+      "flow_group_ids": [1],
+      "completion_token_id": 4
+    }
+  ],
+
+  // 流组把依赖、步骤、光平面、配置、程序时期和具体数据流绑定在一起。
+  // 数组按 flow_group_id 升序排列。
+  "flow_groups": [
+    {
+      // 流组编号。
+      "flow_group_id": 0,
+      // 所属逻辑步骤。
+      "step_id": 0,
+      // 执行该流组的光平面编号，范围为 0 到 plane_count-1。
+      "plane_id": 0,
+      // 使用该平面程序中的时期编号。
+      "program_epoch_id": 0,
+      // 该时期必须安装的完整配置编号。
+      "configuration_id": 0,
+      // 所有父令牌都就绪后流组才可释放；非空、唯一并按升序排列。
+      "depends_on_token_ids": [0],
+      // 流组完成后发布的 flow_group_complete 令牌编号。
+      "completion_token_id": 1,
+      // 本流组包含的数据流编号；非空、唯一并按升序排列。
+      "flow_ids": [0]
+    },
+    {
+      "flow_group_id": 1,
+      "step_id": 1,
+      "plane_id": 0,
+      "program_epoch_id": 0,
+      "configuration_id": 0,
+      // 全步骤同步模式下，下一步骤依赖上一步的 step_complete 令牌。
+      "depends_on_token_ids": [2],
+      "completion_token_id": 3,
+      "flow_ids": [1]
+    }
+  ],
+
+  // 稀疏数据流清单；配置本身不会隐式产生流量。
+  // 数组按 flow_id 升序排列，每条流的 payload_bytes 必须大于 0。
+  "flows": [
+    {
+      // 数据流编号。
+      "flow_id": 0,
+      // 所属流组编号。
+      "flow_group_id": 0,
+      // 源进程编号。
+      "src_rank": 0,
+      // 目的进程编号，必须与流组所用配置的置换一致。
+      "dst_rank": 1,
+      // 本数据流的有效载荷字节数，必须大于 0。
+      "payload_bytes": 1000,
+      // 本数据流承载的逻辑数据段切片；长度之和必须等于 payload_bytes。
+      "segment_slices": [
+        {
+          // 被切片的逻辑数据段编号。
+          "segment_id": 0,
+          // 切片在该数据段内部的起始字节偏移。
+          "segment_offset_bytes": 0,
+          // 本切片字节数，必须大于 0，且不能越过数据段末尾。
+          "length_bytes": 1000
+        }
+      ]
+    },
+    {
+      "flow_id": 1,
+      "flow_group_id": 1,
+      "src_rank": 2,
+      "dst_rank": 3,
+      "payload_bytes": 1000,
+      "segment_slices": [
+        {
+          "segment_id": 1,
+          "segment_offset_bytes": 0,
+          "length_bytes": 1000
+        }
+      ]
+    }
+  ],
+
+  // 每个光平面恰好有一个独立程序，数组按 plane_id 升序排列。
+  "plane_programs": [
+    {
+      // 光平面编号。
+      "plane_id": 0,
+      // 程序时期按 program_epoch_id 连续排列，首个时期必须是 initial。
+      "epochs": [
+        {
+          // 本平面内从 0 开始的连续时期编号。
+          "program_epoch_id": 0,
+          // initial 为首次预安装；retain 保留物理配置；reconfigure 执行真实重构。
+          "transition": "initial",
+          // 本时期使用的配置编号。
+          "configuration_id": 0,
+          // 路径准备不得早于这些令牌；initial 通常为空数组。
+          "path_prep_not_before_token_ids": [],
+          // 必须在本时期执行的流组；非空、唯一并按升序排列。
+          "flow_group_ids": [0, 1]
+        }
+      ]
+    }
+  ],
+
+  // 规划器证明用于追溯和审计；运行时不把这里的绝对时间当作释放命令。
+  "planner_certificate": {
+    // 规划器名称和版本不能为空。
+    "planner_name": "overlap4ocs",
+    "planner_version": "v1",
+    // 未使用求解器时为 null，否则填写实际求解器名称。
+    "solver_name": "gurobi",
+    // 可选值：not_used、feasible、optimal、time_limit_with_incumbent。
+    "solver_status": "optimal",
+    // 目标值、下界和百万分比相对间隙；不适用时为 null。
+    // optimal 的 relative_gap_ppm 必须为 0，目标值必须等于名义时间表的最大完成时间。
+    "objective_ps": 40040,
+    "bound_ps": 40040,
+    "relative_gap_ppm": 0,
+    // 规范化规划决策原始字节的 SHA-256；这里是演示值，正式计划必须替换。
+    "decision_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    // 生产计划必须为每个流组提供一项，按 flow_group_id 升序排列。
+    "nominal_schedule": [
+      {
+        // 被规划的流组编号。
+        "flow_group_id": 0,
+        // 规划器预计的释放和接收完成时间，单位为皮秒。
+        // planned_release_ps 不能晚于 planned_complete_ps。
+        "planned_release_ps": 0,
+        "planned_complete_ps": 20020
+      },
+      {
+        "flow_group_id": 1,
+        "planned_release_ps": 20020,
+        "planned_complete_ps": 40040
+      }
+    ],
+    // 从规划器数值转成整数协议字段的规则名称和版本，不能为空。
+    "integer_lowering_rule": "hand_authored_exact_bytes",
+    "integer_lowering_version": "v1"
+  },
+
+  // 输入来源证明。下面除已知 HTSim 身份外均是演示摘要，正式计划必须替换。
+  "provenance": {
+    // hand_authored_fixture 允许下面的摘要为 null；production 要求完整来源。
+    "source_kind": "production",
+    // overlap4ocs 提交号：40 位小写十六进制。
+    "overlap4ocs_git_sha": "22011bf00d3863fda16baf93a3d05b8e76af9c60",
+    // 上游 HTSim 提交号：40 位小写十六进制。
+    "htsim_upstream_git_sha": "841d9e7be46bb968eece766aa4b6c044c7799f67",
+    // 本地 HTSim 补丁集 SHA-256。
+    "htsim_local_patchset_sha256": "51bece963136736a2528ddad36924d022147ebe80933d58b3307e04ef5d15d37",
+    // 原始实例文件 SHA-256；这里是演示值。
+    "instance_file_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    // 集合通信程序文件 SHA-256；这里是演示值。
+    "program_file_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    // 规范化集合通信中间表示 SHA-256；这里是演示值。
+    "collective_ir_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    // 计划生成上下文 SHA-256；这里是演示值。
+    "plan_build_context_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  }
+}
