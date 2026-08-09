@@ -1,123 +1,148 @@
 {
-  // 本文件是 swot-execution-plan-v2.schema.json 的带注释示例。
-  // JSONC 仅用于阅读；实际传给 htsim_ocs 的文件必须删除注释并使用严格 JSON。
+  // 本文件逐字段演示 swot-execution-plan/v2 执行计划。它同时包含三类信息：
+  // 1. 直接控制仿真的信息，例如流量、依赖、光路配置和光平面程序；
+  // 2. 供解析器交叉检查的信息，例如双向成员关系和连续编号；
+  // 3. 只用于实验身份与结果审计的信息，例如 workload、规划器证明和来源摘要。
+  // JSONC 只用于阅读。htsim_ocs 的 --plan 参数只接受不含注释的严格 JSON；
 
-  // 固定模式版本，只能填写 swot-execution-plan/v2。
+  // 文件 ABI 版本。
   "schema_version": "swot-execution-plan/v2",
 
-  // 案例标识：固定前缀 case-，后接 64 位小写十六进制摘要。
+  // 上游为一个实验案例分配的稳定标识，写入结果文件，便于把计划与结果配对。
+  // 格式必须是 case- 加 64 位小写十六进制。后端只校验格式并原样回写，不会重新计算这 64 位，也不会要求它等于执行计划文件本身的 SHA-256。
   "case_id": "case-103dc7bd29e9a4888802132f68cd02297006eeeae3d12730947799cc057d812c",
 
-  // 调度方案：baseline、one_shot 或 swot。
-  // 它必须与后面的 path_preparation_policy 匹配。
+  // 论文对比方案标签。它不负责生成流量或选择集合通信算法；流量必须在 flows 中给全。
+  // 解析器用它约束 path_preparation_policy：baseline -> step_lockstep，one_shot -> static_preinstalled，swot -> overlap_earliest。
+  // 两者不匹配时计划会在仿真开始前被拒绝。
   "strategy": "one_shot",
 
-  // 单位是固定契约，不能改成其他写法。
+  // 本文件所有数值字段采用的单位声明。后端不会执行自动单位换算，填写者必须在生成 JSON 前完成换算。
   "units": {
-    // 所有数据量都使用字节。
+    // payload_bytes、length_bytes、buffer_offset_bytes 和 message_bytes_per_rank 的单位。
     "data": "byte",
-    // 每个光平面的端点速率使用比特每秒。
+    // per_plane_bps 的单位；例如 400 Gb/s 必须写成 400000000000。
     "rate": "bit_per_second",
-    // 所有仿真时间都使用整数皮秒。
+    // 所有 *_ps 字段和结果时间的单位；只能使用整数皮秒，不能填写小数。
     "time": "picosecond"
   },
 
-  // 集合通信工作负载的身份和规模。
+  // 上游工作负载身份。除 rank_count 外，这一节不直接改变 HTSim 的事件、路径或时序；
+  // 后端不会根据 collective_id 生成或补全集合通信流量，仅作为标识。
   "workload": {
-    // 集合通信名称，不能为空，例如 allreduce。
+    // 集合通信类型标签，例如 allreduce、allgather、reduce_scatter。后端不会检查名称与实际流图是否实现同一种集合通信。
     "collective_id": "allreduce",
-    // 上游生成流量时采用的算法名称，不能为空。
+    // 上游使用的具体算法/变体名称，仅作为标识，用来区分 ring 等生成算法。
     "algorithm_id": "one_shot_static_preinstalled",
-    // 算法流量生成规则的版本，不能为空。
+    // algorithm_id 对应算法的规则版本，仅作标识。
     "algorithm_semantics_version": "fixture/v1",
-    // 集合通信数据语义的版本，不能为空。
+    // 集合通信完成条件和数据所有权规则版本，例如 AllReduce 最终哪些 Rank 应拥有结果，仅作标识。
     "collective_semantics_version": "allreduce/v1",
-    // 进程数量，必须大于 0；合法进程编号为 0 到 rank_count-1。
+    // 参与集合通信的 Rank 数量。合法 Rank 为 0..rank_count-1。
+    // 它必须等于 topology.node_count；所有 permutation、src_rank、dst_rank 和所有权列表都使用这一编号空间。
     "rank_count": 4,
-    // 每个进程的原始消息字节数，可以为 0。
+    // 应用层声明的每 Rank 原始输入消息大小。它用于实验身份和结果解释，不用于计算流大小；每条实际网络传输仍以 flows[].payload_bytes 为准。
+    // 当前后端不会检查二者是否符合某个 AllReduce 算法的理论流量。
     "message_bytes_per_rank": 1000
   },
 
-  // OCS 拓扑与时间参数。
+  // htsim_ocs 实际构造的数据面参数。每个光平面拥有独立的源端、OCS、目的 Pipe、Sink 和重构状态；平面之间只共享同一个仿真时钟，不共享队列或重构状态。
   "topology": {
-    // 节点数，必须大于 0，当前应与 rank_count 一致。
+    // 主机数量。
     "node_count": 4,
-    // 相互独立的光平面数量，必须大于 0。
+    // 并行光平面数量。plane_programs 必须恰好有 plane_count 项，plane_id 为 0..plane_count-1。不同平面可以同时传输或独立重构。
     "plane_count": 1,
-    // 每个光平面、每个源端口的发送速率，单位为比特每秒。
+    // 每平面端口速率，不是所有平面共享的 Rank 总带宽。
     "per_plane_bps": 400000000000,
-    // 数据从交换器前向传播到接收端的单程时延，单位为皮秒。
+    // 数据离开源主机并通过 OCS 检查后，在目的 Pipe 中经历的固定单程传播时延。每个包或合并批次都使用同一个值；不支持按端点、路径或平面设置不同传播时延。
     "data_latency_ps": 20,
-    // 一次真实光路重构的持续时间，单位为皮秒。
+    // 重构时延。
+    // 旧 epoch 的发送队列和在途数据完全排空后才能开始重构。不支持不同配置对使用不同重构时延。
     "reconfiguration_delay_ps": 200,
-    // 当前只支持全双工。
+    // 数据面能力声明，只允许 full。反向流量仍必须作为独立 flow 明确写出，full 并不意味着声明 0->1 后后端会自动生成 1->0。
     "duplex": "full",
-    // 每个平面第一次使用的配置在 0 ps 预安装，不收取重构时间。
+    // 每个被使用平面的 epoch 0 在集合通信开始前视为已安装，0 ps 即可完成路径准备，不产生 reconfiguration_start/end 计时。
+    // 后续 epoch 再按 retain/reconfigure 执行。
     "initial_configuration_policy": "first_use_preinstalled"
   },
 
-  // 论文精确传输模型；这些枚举值目前都是固定的。
+  // 数据传输声明。除 mtu_bytes 外，其余字段都是固定能力声明；解析器用它们拒绝后端尚未实现的有头部、有损或 ACK 模型。
   "transport": {
-    // 当前只支持 paper_exact。
+    // 选择论文使用的精确有效载荷时序模型；不会启用 TCP/RDMA 等协议栈。
     "mode": "paper_exact",
-    // 链路只统计有效载荷，不加入协议头。
+    // 串行化字节只包含 payload_bytes，不附加 Ethernet/IP/传输层头、前导码或帧间隙。
     "wire_model": "payload_only",
-    // 最后一个数据包按剩余字节精确截尾。
+    // 每条流按 MTU 切分，最后一个包携带实际剩余字节，不补齐到完整 MTU。
     "packetization": "exact_tail",
-    // 最大传输单元字节数，范围为 1 到 65535。
+    // 单个逻辑包最多承载的有效载荷。full_packet 用它决定实际事件/包数量；exact_coalesced 仍用它计算逻辑包数和最后一个逻辑包的精确长度。
     "mtu_bytes": 1500,
-    // 当前模型无丢包。
+    // 固定为无损：运行时不随机丢包，也不存在由丢包触发的恢复过程。
     "loss_mode": "lossless",
-    // 当前模型不生成确认报文。
+    // 固定为不产生 ACK。
     "ack_mode": "none",
-    // 数据流在最后一个有效载荷字节到达接收端时完成。
+    // flow 完成时刻取最后一个有效载荷字节到达目的主机的时刻，而不是最后发送时刻。流组、步骤和集合通信的完成令牌都沿用这一接收端完成语义。
     "completion_semantics": "receiver_last_payload_byte"
   },
 
-  // full_packet 逐包执行；exact_coalesced 精确合并连续数据包，适合大规模仿真。
+  // 选择事件粒度：
+  // - full_packet：每个 MTU 包各创建一个 HTSim Packet，并分别经过 OCS、Pipe 和 Sink；
+  // - exact_coalesced：一条 flow 创建一个 OcsTransitBatch，但保留精确总串行化时间、逻辑包数、尾包大小、路由检查和最后字节到达时间。
+  // exact_coalesced 适合大规模 CCT 仿真，但不能提供逐包到达轨迹或瞬时 Pipe 占用。
   "execution_mode": "exact_coalesced",
 
-  // 由计划拥有的确定性与停止预算。
+  // 防止死锁或异常计划无限运行的计划预算。预算写入结果，失败时用于解释停止原因。
   "run_limits": {
-    // 唯一随机种子；当前执行是确定性的，但字段仍必须提供。
+    // 预留的唯一随机种子。当前的排队、路径和事件顺序都是确定性的，仅作标识。
     "seed": 0,
-    // 最大仿真时间，单位为皮秒，必须大于 0。
+    // 允许事件时间推进到的最大仿真时间。成功前若下一事件超过该界限，运行以预算失败结束。
     "max_sim_time_ps": 1000000000000000,
-    // 最多处理的事件数量，必须大于 0。
+    // 整个 EventList 最多分派的事件数，包括发送、Pipe 到达和重构定时器等事件。
+    // full_packet 通常需要远多于 exact_coalesced 的事件，设值时必须考虑 execution_mode。
     "max_events": 10000000
   },
 
-  // global_step_barrier 表示全步骤同步；explicit_group_dag 表示显式流组依赖图。
+  // 解释 flow_groups[].depends_on_token_ids 的依赖规则：
+  // - global_step_barrier：step 0 的所有流组只能依赖 token 0；step N 的所有流组必须只依赖 step N-1 的完成令牌。因此下一步骤要等上一整步的所有流组接收完成。
+  // - explicit_group_dag：每个流组显式列出自己的父令牌，可表达不同 chunk、不同平面独立推进；解析器只检查引用、拓扑编号和全图无环，不替算法推导应有的父依赖。
   "dependency_mode": "global_step_barrier",
 
-  // baseline 必须用 step_lockstep；one_shot 必须用 static_preinstalled；
-  // swot 必须用 overlap_earliest。
+  // 光路准备相对数据依赖的调度策略，必须与 strategy 一一匹配：
+  // - step_lockstep：上一逻辑步骤完成后才准备下一步光路，并等待该步所有路径就绪再传输；
+  // - static_preinstalled：每个使用中的平面只能有一个 initial epoch，全程不重构；
+  // - overlap_earliest：某平面旧 epoch 排空后立即准备下一配置，不等待其他平面或数据令牌。
   "path_preparation_policy": "static_preinstalled",
 
-  // 完整光路配置表。数组按 configuration_id 升序排列，编号从 0 连续开始。
+  // 可被任意光平面 epoch 引用的完整 OCS 配置目录。配置本身没有所属平面和生效时间；plane_programs 中的 epoch 才决定某个平面何时安装哪一项配置。
+  // 数组按序（即 ID 索引），因此 configuration_id 必须从 0 连续编号且等于所在数组下标。
   "configurations": [
     {
-      // 配置编号，在流组和光平面程序中引用。
+      // 配置目录中的稳定编号。flow_group 和 program_epoch 同时引用它，解析器会检查两处一致。
       "configuration_id": 0,
-      // 完整置换：下标是源进程，值是该源在此配置下连接的目的进程。
-      // 长度必须等于 rank_count，每个目的进程必须恰好出现一次。
+      // 完整的源端口到目的端口映射。数组下标是 src_rank，数组值是允许到达的 dst_rank：
+      // permutation[0]=1 表示源 0 的光路接到目的 1；permutation[1]=0 表示反向光路也存在。
+      // 本例完整展开为 0->1、1->0、2->3、3->2。
+      // 长度必须等于 node_count，值必须恰好包含一次 0..node_count-1，保证每个源有一个出口、每个目的有一个入口。映射可以不被 flows 使用；未使用的映射不会产生“虚假流量”。
+      // 某 flow 只有在 permutation[flow.src_rank] == flow.dst_rank 时才能使用该配置。
       "permutation": [1, 0, 3, 2]
     }
   ],
 
-  // 逻辑数据段描述原始缓冲区中的数据所有权。
-  // 数组按 segment_id 升序排列，标识符唯一。
+  // 逻辑数据目录，用于说明 flow 携带的是应用缓冲区中的哪一段数据。
+  // 当前运行时实际发送多少字节以 flows[].payload_bytes 为准；这里主要支持计划审计和segment_slices 的边界/字节和检查。
+  // 后端不会根据 origin/final 列表执行 Reduce，也不会证明 collective_id 所声明的集合通信最终数据正确。
+  // 数组按序（即 ID 索引），segment_id 必须从 0 连续编号。
   "logical_segments": [
     {
-      // 数据段编号，供 flow.segment_slices 引用。
+      // 数据段编号。一个 segment 可以被多条 flow 的不同切片引用。
       "segment_id": 0,
-      // 数据段在逻辑缓冲区中的起始字节偏移，可以为 0。
+      // 该数据段在上游逻辑缓冲区中的全局起始偏移。它用于描述数据身份和检查 uint64 溢出；当前数据面不会根据这个偏移寻址真实内存，也不会把它写进包头参与转发。
       "buffer_offset_bytes": 0,
-      // 数据段长度，必须大于 0。
+      // 此数据段可被切片引用的总长度。每个 segment_slice 的相对区间必须落在[0, length_bytes) 内；它本身不会自动创建一条同样大小的 flow。
       "length_bytes": 1000,
-      // 初始拥有该数据的进程编号；非空、唯一并按升序排列。
+      // 集合通信开始前拥有这段逻辑数据的 Rank。列表必须非空、升序、无重复且 Rank 不越界。当前 htsim_ocs 只校验列表格式，不检查后续 flow 的 src_rank 是否当时确实拥有该切片。
       "origin_rank_ids": [0],
-      // 集合通信结束时应拥有该数据的进程编号；非空、唯一并按升序排列。
+      // 上游语义声明的最终目标 Rank，格式约束与 origin_rank_ids 相同。当前运行时不会追踪所有权状态，也不会在成功退出前验证这些 Rank 都已收到该数据；
+      // 若需要证明完整 AllReduce，生成器或独立语义校验器必须完成这项检查。
       "final_destination_rank_ids": [1]
     },
     {
@@ -129,26 +154,31 @@
     }
   ],
 
-  // 就绪令牌是依赖关系的唯一触发源，数组按 token_id 升序排列。
+  // 显式依赖图中的事件节点。
+  // 当一个流组的所有父 token 都 ready 且对应光路允许传输时，该组内所有 flow 一起释放。
+  // 除 token 0 外，令牌在产生者“接收端完成”后发布。
+  // token_id 必须从 0 连续编号；编号还必须满足父 token ID 小于子组产生的完成 token ID。
   "readiness_tokens": [
     {
-      // 令牌编号，必须唯一。
+      // 固定的集合通信开始令牌，必须是 token 0，并且整份计划只能有一个。
       "token_id": 0,
-      // collective_start 在 0 ps 就绪，且 producer_id 必须为 null。
+      // collective_start 在仿真 0 ps 自动 ready，是首批流组常用的父依赖。
       "token_type": "collective_start",
-      // 产生者编号；集合开始令牌没有产生者。
+      // 此类型没有运行时产生者，因此必须为 null。
       "producer_id": null
     },
     {
       "token_id": 1,
-      // flow_group_complete 由对应 flow_group_id 的流组完成时产生。
+      // flow_group_complete 在 producer_id 指定的流组中所有 flow 最后字节都到达后发布。
       "token_type": "flow_group_complete",
+      // 对 flow_group_complete 来说，此值解释为 flow_group_id；每个流组必须恰好产生一个令牌。
       "producer_id": 0
     },
     {
       "token_id": 2,
-      // step_complete 由对应 step_id 的步骤完成时产生。
+      // step_complete 在 producer_id 指定步骤包含的所有流组接收完成后发布。
       "token_type": "step_complete",
+      // 对 step_complete 来说，此值解释为 step_id；每个逻辑步骤必须恰好产生一个令牌。
       "producer_id": 0
     },
     {
@@ -163,16 +193,18 @@
     }
   ],
 
-  // 逻辑步骤按 step_id 升序排列，编号从 0 连续开始。
+  // 集合通信的逻辑步骤目录。step 用于聚合流组完成状态，并在 global_step_barrier 下形成全步骤屏障；它不自动决定某步使用哪个平面或配置，那些信息仍写在 flow_group 中。
+  // 每个 flow_group 必须恰好属于一个 step，step_id 必须从 0 连续编号。
   "steps": [
     {
-      // 步骤编号。
+      // 逻辑步骤编号，也作为数组索引和 flow_groups[].step_id 的引用目标。
       "step_id": 0,
-      // 人类可读的阶段名称，不能为空；后端不根据名称推断语义。
+      // 供日志、结果和人工分析使用的阶段名称，仅作标识，后端只要求非空。例如 reduce_scatter等。
       "phase": "fixture_phase_0",
-      // 属于本步骤的流组编号；非空、唯一并按升序排列。
+      // 该步骤包含的全部流组。列表必须非空、升序、无重复；整份 steps 合起来必须对所有 flow_group 做恰好一次覆盖，并与每个 flow_group.step_id 反向引用一致。
       "flow_group_ids": [0],
-      // 本步骤完成后发布的 step_complete 令牌编号。
+      // 当 flow_group_ids 中所有组都接收完成时发布的 step_complete token。
+      // 必须指向 readiness_tokens 中 token_type=step_complete 且 producer_id=本 step_id 的项。
       "completion_token_id": 2
     },
     {
@@ -183,25 +215,30 @@
     }
   ],
 
-  // 流组把依赖、步骤、光平面、配置、程序时期和具体数据流绑定在一起。
-  // 数组按 flow_group_id 升序排列。
+  // 流组是运行时释放和完成聚合的最小调度单位。
+  // 一个组的父 token 全部 ready 后，还要等待指定 plane/program epoch 的配置已安装以及策略门控开放，随后组内所有 flow 同时标记为 released 并进入各自源端。
+  // 只有组内所有 flow 在接收端完成，该组才发布 completion_token_id。flow_group_id 必须从 0 连续编号。
   "flow_groups": [
     {
       // 流组编号。
       "flow_group_id": 0,
-      // 所属逻辑步骤。
+      // 所属逻辑步骤。必须与 steps[step_id].flow_group_ids 中的反向成员关系一致。
       "step_id": 0,
-      // 执行该流组的光平面编号，范围为 0 到 plane_count-1。
+      // 承载组内所有 flow 的光平面。不同组可分配到不同平面并行执行；组内不能跨平面。必须与 plane_programs[plane_id] 中包含本组的 epoch 一致。
       "plane_id": 0,
-      // 使用该平面程序中的时期编号。
+      // 本组绑定的平面局部程序时期。只有该 epoch active/path-ready 时本组才能传输；同一 epoch 可包含多个数据依赖不同的流组。
       "program_epoch_id": 0,
-      // 该时期必须安装的完整配置编号。
+      // 本组流量要求的 OCS 配置。它必须等于上述 plane/program epoch 的 configuration_id；
+      // 组内每条 flow 还必须满足相应 permutation[src_rank] == dst_rank。
       "configuration_id": 0,
-      // 所有父令牌都就绪后流组才可释放；非空、唯一并按升序排列。
+      // 数据就绪父依赖。所有列出的 token 都 ready 才满足本组的数据门控；列表必须非空、升序且无重复。
+      // global_step_barrier 下内容由 step_id 唯一确定；explicit_group_dag 下，生成器应按每个 chunk/slice 的本地就绪和远端输入就绪条件显式填写。
       "depends_on_token_ids": [0],
-      // 流组完成后发布的 flow_group_complete 令牌编号。
+      // 本组所有 flow 的最后有效载荷字节到达各自 Sink 后发布的令牌。
+      // 必须指向 token_type=flow_group_complete、producer_id=本 flow_group_id 的 token。
       "completion_token_id": 1,
-      // 本流组包含的数据流编号；非空、唯一并按升序排列。
+      // 组内实际发送的 flow。列表必须非空、升序、无重复；所有 flow 必须被全局恰好覆盖一次，
+      // 并且每个被列出的 flow.flow_group_id 必须反向指回本组。
       "flow_ids": [0]
     },
     {
@@ -210,35 +247,40 @@
       "plane_id": 0,
       "program_epoch_id": 0,
       "configuration_id": 0,
-      // 全步骤同步模式下，下一步骤依赖上一步的 step_complete 令牌。
+      // 本组属于 step 1；在 global_step_barrier 模式下必须且只能依赖 step 0 的完成 token 2。
+      // 因而 flow 1 不会在 flow 0 的最后字节到达之前释放，即使配置 0 始终已经安装。
       "depends_on_token_ids": [2],
       "completion_token_id": 3,
       "flow_ids": [1]
     }
   ],
 
-  // 稀疏数据流清单；配置本身不会隐式产生流量。
-  // 数组按 flow_id 升序排列，每条流的 payload_bytes 必须大于 0。
+  // 实际网络传输清单。只有这里列出的条目才会创建 OcsFlow、占用源串行器并在 Pipe 中传播；
+  // configuration 中未被引用的端口映射不会产生流量。flow_id 必须从 0 连续编号。
+  // 每条 flow 是单源、单目的、固定字节数的单向传输；反向传输必须另建一条 flow。
   "flows": [
     {
-      // 数据流编号。
+      // 数据流编号。运行时用它决定同一次入队中同一源端口多条 flow 的 FIFO 排序，也用它关联结果统计和 flow_complete/flow_last_sent trace 事件。
       "flow_id": 0,
-      // 所属流组编号。
+      // 控制该 flow 何时释放、在哪个平面/epoch/配置执行的流组。
+      // 必须与 flow_groups[flow_group_id].flow_ids 的反向成员关系一致。
       "flow_group_id": 0,
-      // 源进程编号。
+      // 发送端 Rank。运行时把此 flow 放入“plane_id 的 src_rank”对应的源串行器 FIFO；
       "src_rank": 0,
-      // 目的进程编号，必须与流组所用配置的置换一致。
+      // 接收端 Rank，决定使用哪个目的 Pipe 和 Sink。必须满足流组配置中的 permutation[src_rank] == dst_rank，否则在输入校验阶段报 flow_route_mismatch。
       "dst_rank": 1,
-      // 本数据流的有效载荷字节数，必须大于 0。
+      // 真正参与串行化、发送/接收记账和 CCT 计算的有效载荷字节数，必须大于 0。 发送持续时间由它和 per_plane_bps 决定；包数由它和 mtu_bytes 决定。
       "payload_bytes": 1000,
-      // 本数据流承载的逻辑数据段切片；长度之和必须等于 payload_bytes。
+      // 此 flow 在应用语义上承载哪些逻辑数据切片。列表顺序不改变路由或串行化顺序；当前数据面只检查所有 length_bytes 之和恰好等于 payload_bytes，并检查每片不越界。
+      // 一条 flow 可以组合多个 segment 的切片。
       "segment_slices": [
         {
-          // 被切片的逻辑数据段编号。
+          // 被引用的 logical_segments[segment_id]。ID 必须存在。
           "segment_id": 0,
-          // 切片在该数据段内部的起始字节偏移。
+          // 相对该 segment 起点的偏移，不是全局缓冲区偏移；实际全局语义位置为
+          // logical_segment.buffer_offset_bytes + segment_offset_bytes。
           "segment_offset_bytes": 0,
-          // 本切片字节数，必须大于 0，且不能越过数据段末尾。
+          // 从上述相对偏移起包含的字节数，必须大于 0，并满足 segment_offset_bytes + length_bytes <= logical_segment.length_bytes。
           "length_bytes": 1000
         }
       ]
@@ -259,53 +301,73 @@
     }
   ],
 
-  // 每个光平面恰好有一个独立程序，数组按 plane_id 升序排列。
+  // 每个光平面的完整生命周期程序。
+  // 数组必须包含恰好 plane_count 项，plane_id 从 0 连续；一个平面只按自己的 epochs 顺序推进。
+  // 它必须先关闭并排空 epoch N，才能准备 epoch N+1，但其他平面可以同时处于传输或重构状态，因此能够表现 SWOT 的跨平面重叠。
   "plane_programs": [
     {
-      // 光平面编号。
+      // 此程序控制的光平面编号，也必须等于该项的数组下标。
       "plane_id": 0,
-      // 程序时期按 program_epoch_id 连续排列，首个时期必须是 initial。
+      // 该平面将依次经历的配置使用时期。未使用的平面可以填空数组；一旦非空，第一个 epoch 必须是 initial，后续 epoch 只能是 retain 或 reconfigure。
       "epochs": [
         {
-          // 本平面内从 0 开始的连续时期编号。
+          // 平面局部逻辑时期编号，从 0 连续递增。每经过 retain 或 reconfigure 都进入新 epoch；它不同于物理配置代次：retain 增加 program_epoch_id，但不增加物理代次。
           "program_epoch_id": 0,
-          // initial 为首次预安装；retain 保留物理配置；reconfigure 执行真实重构。
+          // 从上一 epoch 进入本 epoch 的动作：
+          // - initial：仅允许 epoch 0，配置在 0 ps 预安装，不计重构时延；
+          // - retain：配置必须与上一 epoch 相同，不启动重构定时器，但建立新的逻辑时期；
+          // - reconfigure：配置必须不同，等待旧数据面排空后计入 reconfiguration_delay_ps，
+          //   定时器结束时才安装新配置并增加 physical_config_generation。
           "transition": "initial",
-          // 本时期使用的配置编号。
+          // 本 epoch 激活时安装的 configurations[] 项。epoch 内所有流组必须引用同一配置；运行时在每个包/批次进入 OCS 时再次检查该配置仍然 active。
           "configuration_id": 0,
-          // 路径准备不得早于这些令牌；initial 通常为空数组。
+          // 路径准备的额外令牌门控：这些 token 未 ready 时，重构/保留新 epoch 的准备过程都不能开始。
+          // 不同策略对该列表有额外约束：
+          //     initial 通常为空；
+          //     baseline 后续 epoch 必须等待前一步完成；
+          //     SWOT overlap_earliest必须为空，以便旧 epoch 排空后立即重构。
+          //它不接受绝对时间，只接受 token。
           "path_prep_not_before_token_ids": [],
-          // 必须在本时期执行的流组；非空、唯一并按升序排列。
+          // 必须在这个平面时期执行的全部流组，非空、升序且无重复。
+          // 所有 plane_program/epoch 合起来必须对 flow_groups 做恰好一次覆盖，并与每个组的 plane_id、program_epoch_id、configuration_id 三个反向字段完全一致。
+          // epoch 只有在这些组全部接收完成且串行器/在途数据都排空后才能关闭。
           "flow_group_ids": [0, 1]
         }
       ]
     }
   ],
 
-  // 规划器证明用于追溯和审计；运行时不把这里的绝对时间当作释放命令。
+  // 上游规划决策的标识。
   "planner_certificate": {
-    // 规划器名称和版本不能为空。
+    // 生成配置分配、依赖和光平面程序的工具名称，仅作标识。
     "planner_name": "overlap4ocs",
+    // 上述规划器输出规则的版本。
     "planner_version": "v1",
-    // 未使用求解器时为 null，否则填写实际求解器名称。
+    // 实际产生决策的优化求解器名称，例如 gurobi、pulp/cbc；solver_status=not_used 时必须为 null。
     "solver_name": "gurobi",
-    // 可选值：not_used、feasible、optimal、time_limit_with_incumbent。
+    // 求解结束状态：
+    // - not_used：没有调用优化求解器；
+    // - feasible：找到可行解，但没有最优性声明；
+    // - optimal：证明最优，此时 relative_gap_ppm 必须为 0；
+    // - time_limit_with_incumbent：到达时间上限，但保留了可行 incumbent。
     "solver_status": "optimal",
-    // 目标值、下界和百万分比相对间隙；不适用时为 null。
-    // optimal 的 relative_gap_ppm 必须为 0，目标值必须等于名义时间表的最大完成时间。
+    // 规划器目标值，单位 ps。生产计划由求解器生成时必须存在，并且必须等于 nominal_schedule 中最大的 planned_complete_ps；它不是仿真器的停止时间。
     "objective_ps": 40040,
+    // 求解器报告的目标下界，单位 ps，用于判断 incumbent 离理论最优还有多远。
+    // 后端只保存/校验数值类型，不据此缩短或延长仿真。
     "bound_ps": 40040,
+    // 规划器按百万分之一编码的相对 gap，避免 JSON 浮点不确定性；0 表示无 gap。
     "relative_gap_ppm": 0,
-    // 规范化规划决策原始字节的 SHA-256；这里是演示值，正式计划必须替换。
+    // 规范化“规划决策内容”的 SHA-256，用于检测从求解器结果到执行计划的决策漂移。后端只检查生产计划中存在且格式为 64 位小写十六进制，不会重新构造决策并验算摘要。
     "decision_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-    // 生产计划必须为每个流组提供一项，按 flow_group_id 升序排列。
+    // 规划器对每个流组给出的名义时间表。生产计划必须按 flow_group_id 升序恰好覆盖所有组。 这些时间用于将规划预测与仿真 release/completion 结果对比，不是运行时定时命令。
     "nominal_schedule": [
       {
-        // 被规划的流组编号。
+        // 被预测的流组编号，必须存在且在数组中唯一。
         "flow_group_id": 0,
-        // 规划器预计的释放和接收完成时间，单位为皮秒。
-        // planned_release_ps 不能晚于 planned_complete_ps。
+        // 规划器预计该组进入源端串行器的时间，单位 ps。仿真可能因真实依赖/路径状态不同得到不同的 release_ps；后端不会等待到此时间才释放。
         "planned_release_ps": 0,
+        // 规划器预计该组所有 flow 在接收端完成的时间，单位 ps，必须不早于 planned_release_ps。
         "planned_complete_ps": 20020
       },
       {
@@ -314,28 +376,29 @@
         "planned_complete_ps": 40040
       }
     ],
-    // 从规划器数值转成整数协议字段的规则名称和版本，不能为空。
+    // 将规划器内部浮点/有理数、字节分块和时间值转换为本 ABI uint64 字段所采用的规则。 名称与版本用于复现实验中的舍入、余数字节分配和时间取整；后端只记录，不重新执行规则。
     "integer_lowering_rule": "hand_authored_exact_bytes",
     "integer_lowering_version": "v1"
   },
 
-  // 输入来源证明。下面除已知 HTSim 身份外均是演示摘要，正式计划必须替换。
+  // 生成本计划所使用输入和代码的来源标识。
   "provenance": {
-    // hand_authored_fixture 允许下面的摘要为 null；production 要求完整来源。
+    // hand_authored_fixture 表示人工测试夹具，下面七个摘要必须全部为 null；
+    // production 表示正式计划，下面七个摘要必须全部非 null，且 planner certificate 必须完整。
     "source_kind": "production",
-    // overlap4ocs 提交号：40 位小写十六进制。
+    // 生成计划的 overlap4ocs 源码 Git commit，必须是 40 位小写十六进制。
     "overlap4ocs_git_sha": "22011bf00d3863fda16baf93a3d05b8e76af9c60",
-    // 上游 HTSim 提交号：40 位小写十六进制。
+    // 本地后端补丁所基于的上游 HTSim Git commit，用来固定基础仿真器版本。
     "htsim_upstream_git_sha": "841d9e7be46bb968eece766aa4b6c044c7799f67",
-    // 本地 HTSim 补丁集 SHA-256。
+    // 在上述 HTSim commit 上应用的本地补丁集合规范化 SHA-256，用来区分不同数据面实现。
     "htsim_local_patchset_sha256": "51bece963136736a2528ddad36924d022147ebe80933d58b3307e04ef5d15d37",
-    // 原始实例文件 SHA-256；这里是演示值。
+    // 规划器读取的原始实例/拓扑参数文件字节摘要；此处是演示值。
     "instance_file_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    // 集合通信程序文件 SHA-256；这里是演示值。
+    // 定义集合通信步骤、伙伴关系或程序的源文件字节摘要；此处是演示值。
     "program_file_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    // 规范化集合通信中间表示 SHA-256；这里是演示值。
+    // 上游把算法展开成确定性步骤/数据所有权后的规范化 collective IR 摘要；此处是演示值。
     "collective_ir_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-    // 计划生成上下文 SHA-256；这里是演示值。
+    // 未被单独字段覆盖、但会影响计划生成的完整上下文摘要，例如生成器参数、能力投影、规范化选项和环境选择；此处是演示值。
     "plan_build_context_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
   }
 }
